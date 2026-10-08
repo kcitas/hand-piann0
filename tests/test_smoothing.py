@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from handpiano.tracking.smoothing import OneEuroFilter, SmoothingConfig, SmoothingKind
+from handpiano.tracking.smoothing_eval import evaluate
 
 FPS = 30.0
 DT = 1.0 / FPS
@@ -87,3 +88,32 @@ def test_filters_landmark_arrays_elementwise():
     out = f(pts + 0.01, DT)
     assert out.shape == (21, 3)
     assert np.all((out > 0.5) & (out < 0.51))
+
+
+# --- quantitative properties claimed in the README (synthetic, 24 fps, default config) ---
+
+
+@pytest.fixture(scope="module")
+def report():
+    return evaluate(fps=24.0, noise_std=0.0015)
+
+
+def test_reduces_noise_at_rest_by_at_least_half(report):
+    assert report.noise_reduction >= 0.5
+
+
+def test_lag_shrinks_as_the_finger_moves_faster(report):
+    lags = [report.ramp_lag_one_euro_ms[s] for s in sorted(report.ramp_lag_one_euro_ms)]
+    assert lags == sorted(lags, reverse=True)
+    assert report.ramp_lag_one_euro_ms[1.0] <= 15.0  # fast moves: small lag
+    assert report.ramp_lag_one_euro_ms[0.1] <= 60.0  # slow moves still lag noticeably (documented)
+
+
+def test_less_lag_than_equally_stable_ema_at_every_speed(report):
+    for speed, lag in report.ramp_lag_one_euro_ms.items():
+        assert lag < report.ramp_lag_ema_ms[speed]
+
+
+def test_settles_after_a_jump_within_three_frames(report):
+    assert report.step_settle_one_euro <= 3
+    assert report.step_settle_one_euro < report.step_settle_ema

@@ -45,7 +45,7 @@ class HandTracker:
     every frame, which is both faster and steadier than IMAGE mode.
     """
 
-    def __init__(self, config: DetectorConfig) -> None:
+    def __init__(self, config: DetectorConfig, mirrored_input: bool = True) -> None:
         if not config.model_path.is_file():
             raise ModelLoadError(f"model not found: {config.model_path}", missing=True)
         # Imported lazily: loading MediaPipe is slow and tests that fake the
@@ -67,6 +67,7 @@ class HandTracker:
         except Exception as exc:  # MediaPipe raises RuntimeError/ValueError variants
             raise ModelLoadError(f"landmarker init failed: {exc}") from exc
         self._last_timestamp_ms = -1
+        self._mirrored_input = mirrored_input
 
     def detect(self, rgb: np.ndarray, timestamp_ms: int) -> list[HandObservation]:
         # VIDEO mode requires strictly increasing timestamps.
@@ -74,7 +75,7 @@ class HandTracker:
         self._last_timestamp_ms = timestamp_ms
         image = self._mp.Image(image_format=self._mp.ImageFormat.SRGB, data=np.ascontiguousarray(rgb))
         result = self._landmarker.detect_for_video(image, timestamp_ms)
-        return observations_from_result(result)
+        return observations_from_result(result, mirrored_input=self._mirrored_input)
 
     def close(self) -> None:
         self._landmarker.close()

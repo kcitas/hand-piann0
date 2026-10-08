@@ -17,6 +17,7 @@ from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from handpiano.app.application import Application  # noqa: E402
 from handpiano.app.config import AppConfig  # noqa: E402
+from handpiano.metrics.performance import CpuAccounting  # noqa: E402
 from handpiano.ui.main_window import ICON_PATH, MainWindow  # noqa: E402
 
 
@@ -28,6 +29,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--fps", type=int, default=30, help="FPS solicitados; la cámara puede entregar otro valor")
     parser.add_argument("--no-mirror", action="store_true", help="no reflejar la imagen (vista no-espejo)")
     parser.add_argument("--lab", action="store_true", help="abrir con el Tracking Lab visible")
+    parser.add_argument(
+        "--check-hands",
+        action="store_true",
+        help="validación guiada LEFT/RIGHT con instrucciones en pantalla (abre el Tracking Lab)",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     return parser.parse_args(argv)
 
@@ -55,13 +61,16 @@ def main(argv: list[str] | None = None) -> int:
     qt_app = QApplication(sys.argv[:1])
     qt_app.setApplicationName("HandPiano")
     qt_app.setWindowIcon(QIcon(str(ICON_PATH)))
-    window = MainWindow(config.camera)
-    app = Application(config, window)
+    cpu = CpuAccounting()
+    window = MainWindow(config.camera, cpu=cpu)
+    app = Application(config, window, cpu=cpu)
     qt_app.aboutToQuit.connect(app.shutdown)
     window.show()
-    if args.lab:
+    if args.lab or args.check_hands:
         window.set_lab_mode(True)
     app.start()
+    if args.check_hands:
+        app.request_handedness_check()
     return qt_app.exec()
 
 

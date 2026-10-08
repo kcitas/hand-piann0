@@ -1,10 +1,11 @@
 """Downloads the MediaPipe hand landmarker model once. After this, HandPiano runs offline.
 
-Usage: python scripts/download_model.py
+Usage: python scripts/download_model.py [--output PATH]
 """
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import sys
 import urllib.request
@@ -18,16 +19,19 @@ TARGET = Path(__file__).resolve().parents[1] / "models" / "hand_landmarker.task"
 
 
 def main() -> int:
-    TARGET.parent.mkdir(parents=True, exist_ok=True)
-    if TARGET.is_file():
-        print(f"Model already present: {TARGET}")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", type=Path, default=TARGET, help=f"destination (default: {TARGET})")
+    target: Path = parser.parse_args().output
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.is_file():
+        print(f"Model already present: {target}")
     else:
         print(f"Downloading {MODEL_URL}")
-        tmp = TARGET.with_suffix(".part")
+        tmp = target.with_suffix(".part")
         urllib.request.urlretrieve(MODEL_URL, tmp)
-        tmp.replace(TARGET)
-    digest = hashlib.sha256(TARGET.read_bytes()).hexdigest()
-    print(f"{TARGET} ({TARGET.stat().st_size / 1e6:.1f} MB) sha256={digest}")
+        tmp.replace(target)
+    digest = hashlib.sha256(target.read_bytes()).hexdigest()
+    print(f"{target} ({target.stat().st_size / 1e6:.1f} MB) sha256={digest}")
     if digest != EXPECTED_SHA256:
         print("WARNING: checksum differs from the version HandPiano was tested with.", file=sys.stderr)
         return 1

@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from handpiano.camera.camera_config import FPS_PRESETS, RESOLUTION_PRESETS, CameraSettings
+from handpiano.metrics.performance import CpuAccounting
 from handpiano.ui.camera_view import CameraView
 from handpiano.ui.debug_view import DebugView
 
@@ -41,14 +42,14 @@ class MainWindow(QMainWindow):
     apply_camera_requested = Signal(object)  # CameraSettings
     probe_requested = Signal()
 
-    def __init__(self, settings: CameraSettings) -> None:
+    def __init__(self, settings: CameraSettings, cpu: CpuAccounting | None = None) -> None:
         super().__init__()
         self.setWindowTitle("HandPiano")
         self.resize(1280, 800)
         self.setStyleSheet(STYLE)
         self._settings = settings
 
-        self.camera_view = CameraView()
+        self.camera_view = CameraView(cpu=cpu)
         self.setCentralWidget(self.camera_view)
 
         self.debug_view = DebugView()

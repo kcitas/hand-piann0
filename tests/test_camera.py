@@ -13,7 +13,7 @@ from tests.fakes import FakeCapture
 
 
 def _frame(i: int) -> Frame:
-    return Frame(index=i, image=np.zeros((2, 2, 3), np.uint8), captured_at_ns=i)
+    return Frame(index=i, image=np.zeros((2, 2, 3), np.uint8), captured_at_ns=i, published_at_ns=i)
 
 
 def test_camera_reports_actual_mode_not_requested():
@@ -76,6 +76,28 @@ def test_slot_keeps_only_latest_and_counts_drops():
     assert slot.take(timeout=0) is None  # no new frame since last take
 
 
+def test_slot_never_holds_more_than_one_frame_under_fast_producer():
+    slot = LatestFrameSlot()
+    producer = threading.Thread(target=lambda: [slot.put(_frame(i)) for i in range(5000)])
+    producer.start()
+    max_pending = 0
+    taken = []
+    while producer.is_alive():
+        max_pending = max(max_pending, slot.pending)
+        frame = slot.take(timeout=0.001)
+        if frame is not None:
+            taken.append(frame.index)
+    producer.join()
+    last = slot.take(timeout=0)
+    if last is not None:
+        taken.append(last.index)
+    assert max_pending <= 1
+    assert taken == sorted(taken)  # never an older frame after a newer one
+    assert taken[-1] == 4999  # the newest frame is always delivered
+    assert slot.produced == 5000
+    assert slot.dropped == 5000 - len(taken)  # every frame is either taken or counted as dropped
+
+
 def test_slot_take_wakes_on_put():
     slot = LatestFrameSlot()
     result: list[Frame | None] = []
@@ -105,6 +127,8 @@ def test_capture_thread_mirrors_and_converts_to_rgb():
     thread.join(2)
     frame = slot.take(timeout=0)
     assert frame is not None
+    assert frame.captured_at_ns <= frame.published_at_ns
+    assert not frame.image.flags.writeable  # shared with the UI thread: read-only
     # Fake paints the LEFT half blue in BGR; mirrored + RGB → RIGHT half has blue in channel 2.
     assert frame.image[0, -1, 2] == 255 and frame.image[0, 0, 2] == 0
     assert thread.error is not None  # fake ran out of frames → reported, not crashed

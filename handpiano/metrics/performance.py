@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import threading
 import time
-from collections import deque
+from collections import defaultdict, deque
+from dataclasses import dataclass
 
 
 class RateCounter:
@@ -41,22 +42,76 @@ class RateCounter:
             self._ticks.popleft()
 
 
-class ProcessCpuMonitor:
-    """CPU used by this process, as a percentage of ONE core (can exceed 100 % on multicore).
+class CpuComponent:
+    """Names of the parts of the program whose CPU time is accounted separately."""
 
-    Uses ``time.process_time`` (user + system time of all threads) against wall time.
+    CAPTURE = "captura"  # camera read + mirror + BGR→RGB, capture thread
+    INFERENCE = "inferencia"  # MediaPipe call, measured on the tracking thread only
+    TRACKER = "tracker"  # identity + outliers + smoothing + finger state
+    UI = "UI"  # Qt main thread: polling, painting, stats
+
+
+class CpuAccounting:
+    """Accumulates CPU seconds per component.
+
+    Each thread measures its own ``time.thread_time()`` around its work and adds
+    the delta here. Threads that HandPiano does not own (MediaPipe's internal
+    worker pool, Qt/OS threads) cannot be measured this way; their CPU shows up
+    as the difference between process CPU and the sum of components.
     """
 
-    def __init__(self, clock=time.perf_counter, cpu_clock=time.process_time) -> None:
-        self._clock = clock
-        self._cpu_clock = cpu_clock
-        self._last_wall: float | None = None
-        self._last_cpu: float | None = None
+    def __init__(self) -> None:
+        self._totals: defaultdict[str, float] = defaultdict(float)
+        self._lock = threading.Lock()
 
-    def sample(self) -> float | None:
-        wall, cpu = self._clock(), self._cpu_clock()
-        previous_wall, previous_cpu = self._last_wall, self._last_cpu
-        self._last_wall, self._last_cpu = wall, cpu
-        if previous_wall is None or previous_cpu is None or wall <= previous_wall:
+    def add(self, component: str, cpu_seconds: float) -> None:
+        if cpu_seconds > 0:
+            with self._lock:
+                self._totals[component] += cpu_seconds
+
+    def totals(self) -> dict[str, float]:
+        with self._lock:
+            return dict(self._totals)
+
+
+@dataclass(frozen=True, slots=True)
+class CpuBreakdown:
+    """CPU use over one sampling interval, in % of ONE core (can exceed 100 %)."""
+
+    process_pct: float
+    components_pct: dict[str, float]
+
+    @property
+    def unattributed_pct(self) -> float:
+        """Process CPU not measured by any component (MediaPipe worker threads, Qt, OS)."""
+        return max(0.0, self.process_pct - sum(self.components_pct.values()))
+
+
+class CpuSampler:
+    """Turns cumulative CPU counters into per-interval percentages."""
+
+    def __init__(
+        self,
+        accounting: CpuAccounting | None = None,
+        clock=time.perf_counter,
+        process_clock=time.process_time,
+    ) -> None:
+        self._accounting = accounting
+        self._clock = clock
+        self._process_clock = process_clock
+        self._last: tuple[float, float, dict[str, float]] | None = None
+
+    def sample(self) -> CpuBreakdown | None:
+        wall, cpu = self._clock(), self._process_clock()
+        totals = self._accounting.totals() if self._accounting else {}
+        previous, self._last = self._last, (wall, cpu, totals)
+        if previous is None:
             return None
-        return 100.0 * (cpu - previous_cpu) / (wall - previous_wall)
+        prev_wall, prev_cpu, prev_totals = previous
+        elapsed = wall - prev_wall
+        if elapsed <= 0:
+            return None
+        components = {
+            name: 100.0 * (seconds - prev_totals.get(name, 0.0)) / elapsed for name, seconds in totals.items()
+        }
+        return CpuBreakdown(process_pct=100.0 * (cpu - prev_cpu) / elapsed, components_pct=components)

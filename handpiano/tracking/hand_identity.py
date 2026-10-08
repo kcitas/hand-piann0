@@ -7,7 +7,8 @@ with temporal continuity:
 
 * two hands with different labels → trust the labels;
 * two hands with the same label → disambiguate by horizontal position
-  (in the mirrored view the user's left hand is on the left);
+  (in the mirrored view the user's left hand is on the image's left; in the
+  unmirrored view it is on the right);
 * one hand that stays near where a known hand was → keep that identity unless
   the detector insists on the other label for ``label_switch_frames`` frames.
 """
@@ -29,6 +30,8 @@ class IdentityConfig:
     memory_s: float = 0.3
     # Consecutive frames the detector must disagree before a tracked hand is relabeled.
     label_switch_frames: int = 6
+    # Whether frames are mirrored (selfie view). Decides which side is the user's left.
+    mirrored_view: bool = True
 
 
 @dataclass(slots=True)
@@ -55,7 +58,7 @@ class HandIdentityResolver:
             if a.handedness is not b.handedness:
                 assigned = {a.handedness: a, b.handedness: b}
             else:
-                left, right = sorted(hands, key=lambda o: float(o.wrist[0]))
+                left, right = sorted(hands, key=lambda o: float(o.wrist[0]), reverse=not self.config.mirrored_view)
                 assigned = {Handedness.LEFT: left, Handedness.RIGHT: right}
             for memory in self._memory.values():
                 memory.disagreements = 0

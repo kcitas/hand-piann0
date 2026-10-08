@@ -1,8 +1,8 @@
 import pytest
 
 from handpiano.metrics.latency import RollingStats
-from handpiano.metrics.performance import ProcessCpuMonitor, RateCounter
-from handpiano.metrics.tracking_metrics import PresenceRate
+from handpiano.metrics.performance import CpuAccounting, CpuComponent, CpuSampler, RateCounter
+from handpiano.metrics.tracking_metrics import RollingFraction
 
 
 def test_rolling_stats_empty_reports_none():
@@ -30,6 +30,13 @@ def test_rolling_stats_window_discards_old_samples():
     assert stats.summary().max == 3
 
 
+def test_rolling_stats_clear():
+    stats = RollingStats()
+    stats.add(5)
+    stats.clear()
+    assert stats.summary().count == 0
+
+
 def test_rate_counter_needs_two_ticks():
     rc = RateCounter(window_s=2.0)
     assert rc.rate(now=0.0) is None
@@ -51,20 +58,39 @@ def test_rate_counter_forgets_old_ticks():
     assert rc.rate(now=5.0) is None
 
 
-def test_cpu_monitor_uses_cpu_over_wall_time():
-    wall = iter([0.0, 1.0, 2.0])
-    cpu = iter([0.0, 0.5, 2.0])
-    mon = ProcessCpuMonitor(clock=lambda: next(wall), cpu_clock=lambda: next(cpu))
-    assert mon.sample() is None
-    assert mon.sample() == pytest.approx(50.0)
-    assert mon.sample() == pytest.approx(150.0)  # more than one core in use
+def test_cpu_sampler_first_sample_is_unknown():
+    assert CpuSampler(clock=lambda: 0.0, process_clock=lambda: 0.0).sample() is None
 
 
-def test_presence_rate():
-    pr = PresenceRate(window=4)
-    assert pr.lost_rate() is None
-    for present in (True, False, True, True):
-        pr.add(present)
-    assert pr.lost_rate() == pytest.approx(0.25)
-    pr.add(False)  # window drops the first True
-    assert pr.lost_rate() == pytest.approx(0.5)
+def test_cpu_sampler_breakdown_and_unattributed():
+    acc = CpuAccounting()
+    wall = iter([0.0, 2.0])
+    proc = iter([0.0, 3.0])  # 3 CPU-s in 2 wall-s = 150 % of one core
+    sampler = CpuSampler(acc, clock=lambda: next(wall), process_clock=lambda: next(proc))
+    sampler.sample()
+    acc.add(CpuComponent.INFERENCE, 1.0)
+    acc.add(CpuComponent.UI, 0.4)
+    b = sampler.sample()
+    assert b.process_pct == pytest.approx(150.0)
+    assert b.components_pct[CpuComponent.INFERENCE] == pytest.approx(50.0)
+    assert b.components_pct[CpuComponent.UI] == pytest.approx(20.0)
+    # 150 − 70: CPU of threads HandPiano cannot see (MediaPipe workers, Qt, OS).
+    assert b.unattributed_pct == pytest.approx(80.0)
+
+
+def test_cpu_accounting_ignores_non_positive():
+    acc = CpuAccounting()
+    acc.add(CpuComponent.UI, 0.0)
+    acc.add(CpuComponent.UI, -1.0)
+    assert acc.totals() == {}
+
+
+def test_rolling_fraction():
+    rf = RollingFraction(window=4)
+    assert rf.fraction() is None
+    for v in (True, False, True, True):
+        rf.add(v)
+    assert rf.fraction() == pytest.approx(0.75)
+    rf.add(False)  # window drops the first True
+    assert rf.fraction() == pytest.approx(0.5)
+    assert rf.count() == 4

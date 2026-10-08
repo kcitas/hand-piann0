@@ -11,11 +11,14 @@ import numpy as np
 @dataclass(frozen=True, slots=True)
 class Frame:
     index: int
-    # RGB, already mirrored if the camera settings ask for it.
+    # RGB, already mirrored if the camera settings ask for it. Read-only: the
+    # same array is shared by the tracking thread and the UI.
     image: np.ndarray
     # time.perf_counter_ns() right after the driver returned the frame. Sensor
     # exposure and driver buffering happen BEFORE this instant and are not measurable here.
     captured_at_ns: int
+    # time.perf_counter_ns() after mirror + BGR→RGB, when the frame was put in the slot.
+    published_at_ns: int
 
     @property
     def width(self) -> int:
@@ -54,6 +57,12 @@ class LatestFrameSlot:
             self._cond.wait_for(lambda: self._frame is not None or self._closed, timeout)
             frame, self._frame = self._frame, None
             return frame
+
+    @property
+    def pending(self) -> int:
+        """Frames waiting to be taken: by construction 0 or 1."""
+        with self._cond:
+            return 0 if self._frame is None else 1
 
     def close(self) -> None:
         with self._cond:

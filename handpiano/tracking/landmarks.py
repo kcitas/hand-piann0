@@ -57,10 +57,17 @@ class Finger(Enum):
 
 
 class Handedness(Enum):
-    """The user's real hand. Valid when frames are mirrored before inference (selfie view)."""
+    """The user's physical hand (estimated), never MediaPipe's raw label.
+
+    See ``observations_from_result`` for how the raw label is converted.
+    """
 
     LEFT = "Left"
     RIGHT = "Right"
+
+    @property
+    def opposite(self) -> Handedness:
+        return Handedness.RIGHT if self is Handedness.LEFT else Handedness.LEFT
 
     @property
     def short(self) -> str:
@@ -112,6 +119,8 @@ class HandObservation:
     the wrist as origin, roughly in the same scale as x. Smaller z = closer to camera.
     """
 
+    # The user's physical hand as estimated from this frame alone (already converted
+    # from MediaPipe's label; no temporal identity applied yet).
     handedness: Handedness
     # MediaPipe's handedness classification score: how sure it is about left/right
     # on this frame. It is the only per-hand score the Tasks API exposes.
@@ -123,17 +132,28 @@ class HandObservation:
         return self.landmarks[Landmark.WRIST, :2]
 
 
-def observations_from_result(result: Any) -> list[HandObservation]:
-    """Converts a MediaPipe ``HandLandmarkerResult`` into plain observations."""
+def observations_from_result(result: Any, mirrored_input: bool) -> list[HandObservation]:
+    """Converts a MediaPipe ``HandLandmarkerResult`` into plain observations.
+
+    MediaPipe Tasks labels the hand by how it LOOKS in the image it receives. A
+    mirrored image of a right hand looks like a left hand, so when HandPiano feeds
+    mirrored frames (selfie view, the default) the label is the opposite of the
+    user's physical hand and is inverted here. With unmirrored frames it is used as is.
+
+    Validated on 2026-10-08 with the real camera in mirrored view: both hands
+    raised, palms to the camera, uncrossed — the hand on the image's left (the
+    user's left) came back as "Right" (score 0.95) and the other as "Left".
+    """
     observations: list[HandObservation] = []
     for landmarks, categories in zip(result.hand_landmarks, result.handedness, strict=False):
         if len(landmarks) != NUM_LANDMARKS or not categories:
             continue
         best = max(categories, key=lambda c: c.score)
         try:
-            handedness = Handedness(best.category_name)
+            label = Handedness(best.category_name)
         except ValueError:
             continue
+        handedness = label.opposite if mirrored_input else label
         points = np.array([(p.x, p.y, p.z) for p in landmarks], dtype=np.float32)
         observations.append(HandObservation(handedness=handedness, score=float(best.score), landmarks=points))
     return observations

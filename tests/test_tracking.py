@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from handpiano.tracking.finger_tracker import FingerTracker, FingerTrackerConfig, TrackStatus
+from handpiano.tracking.finger_tracker import FingerTracker, FingerTrackerConfig, TrackStatus, jitter_px
 from handpiano.tracking.hand_identity import HandIdentityResolver, IdentityConfig
 from handpiano.tracking.landmarks import (
     HAND_CONNECTIONS,
@@ -53,7 +53,7 @@ def _mp_result(*hands):
 def test_converts_mediapipe_result():
     pts = [(i / 21, 0.5, 0.0) for i in range(21)]
     result = _mp_result((pts, [SimpleNamespace(category_name="Left", score=0.9)]))
-    (obs,) = observations_from_result(result)
+    (obs,) = observations_from_result(result, mirrored_input=False)
     assert obs.handedness is L
     assert obs.score == pytest.approx(0.9)
     assert obs.landmarks.shape == (21, 3)
@@ -68,7 +68,22 @@ def test_conversion_skips_malformed_hands():
         (good, [SimpleNamespace(category_name="Unknown", score=0.9)]),
         (good, []),
     )
-    assert observations_from_result(result) == []
+    assert observations_from_result(result, mirrored_input=True) == []
+
+
+def test_mirrored_input_inverts_mediapipe_label():
+    """Regression for the inversion found with the real camera (2026-10-08).
+
+    In the mirrored view the user's left hand is on the image's left and MediaPipe
+    labels it "Right" (it looks like a right hand once mirrored).
+    """
+    pts = [(0.2, 0.5, 0.0)] * 21
+    result = _mp_result((pts, [SimpleNamespace(category_name="Right", score=0.95)]))
+    (mirrored,) = observations_from_result(result, mirrored_input=True)
+    (unmirrored,) = observations_from_result(result, mirrored_input=False)
+    assert mirrored.handedness is L
+    assert unmirrored.handedness is R
+    assert mirrored.score == pytest.approx(0.95)
 
 
 # --- hand identity ------------------------------------------------------------
@@ -81,11 +96,18 @@ def test_two_hands_with_distinct_labels_are_trusted():
     assert assigned[L] is left and assigned[R] is right
 
 
-def test_duplicate_labels_are_split_by_position():
+def test_duplicate_labels_are_split_by_position_in_mirrored_view():
     r = HandIdentityResolver()
     a, b = make_hand(R, (0.7, 0.5)), make_hand(R, (0.3, 0.5))
     assigned = r.resolve([a, b], 0.0)
     assert assigned[L] is b and assigned[R] is a
+
+
+def test_duplicate_labels_in_unmirrored_view_put_left_hand_on_image_right():
+    r = HandIdentityResolver(IdentityConfig(mirrored_view=False))
+    a, b = make_hand(R, (0.7, 0.5)), make_hand(R, (0.3, 0.5))
+    assigned = r.resolve([a, b], 0.0)
+    assert assigned[L] is a and assigned[R] is b
 
 
 def test_single_hand_label_flicker_is_ignored():
@@ -181,14 +203,103 @@ def test_persistent_jump_is_eventually_accepted():
     assert statuses[2] is TrackStatus.TRACKED
 
 
-def test_jitter_is_measured_once_enough_samples():
-    tracker = FingerTracker(FingerTrackerConfig())
-    rng = np.random.default_rng(0)
+# --- jitter -------------------------------------------------------------------
+
+W, H = 1280, 720
+
+
+def _noisy_still_run(sigma_x_px, sigma_y_px, frames=400, seed=0, config=None):
+    tracker = FingerTracker(config or FingerTrackerConfig())
+    rng = np.random.default_rng(seed)
     hand = make_hand(R)
+    states = []
+    for k in range(frames):
+        dx = float(rng.normal(0, sigma_x_px / W)) if sigma_x_px else 0.0
+        dy = float(rng.normal(0, sigma_y_px / H)) if sigma_y_px else 0.0
+        states.append(tracker.update([shifted(hand, dx=dx, dy=dy)], k * DT))
+    return states
+
+
+def _mean_jitter(states, attr, finger=FingerId.RIGHT_INDEX):
+    values = [jitter_px(getattr(s.fingers[finger], attr), W, H) for s in states]
+    values = [v for v in values if v is not None]
+    return float(np.mean(values)), values
+
+
+def test_jitter_is_na_until_window_is_full():
+    config = FingerTrackerConfig(jitter_window=15)
+    states = _noisy_still_run(2, 2, frames=15, config=config)
+    assert all(s.fingers[FingerId.RIGHT_INDEX].raw_jitter is None for s in states[:14])
+    assert states[14].fingers[FingerId.RIGHT_INDEX].raw_jitter is not None
+
+
+def test_raw_jitter_matches_known_pixel_noise():
+    # Gaussian noise of 2 px per axis → expected RMS ≈ sqrt(2·2²·(n−2)/n) ≈ 2.63 px for n=15
+    # (the line fit absorbs 2 degrees of freedom).
+    mean, _ = _mean_jitter(_noisy_still_run(2, 2), "raw_jitter")
+    assert mean == pytest.approx(np.sqrt(8 * 13 / 15), rel=0.1)
+
+
+def test_jitter_uses_frame_height_for_y():
+    """Regression: y must be scaled by the height, not the width (bug in the first version)."""
+    mean, _ = _mean_jitter(_noisy_still_run(0, 3), "raw_jitter")  # noise only in y: 3 px of a 720 px frame
+    assert mean == pytest.approx(3 * np.sqrt(13 / 15), rel=0.1)
+
+
+def test_jitter_px_conversion_per_axis():
+    assert jitter_px((0.0, (1 / H) ** 2), W, H) == pytest.approx(1.0)
+    assert jitter_px(((1 / W) ** 2, 0.0), W, H) == pytest.approx(1.0)
+    assert jitter_px(None, W, H) is None
+
+
+def test_steady_motion_is_not_jitter():
+    tracker = FingerTracker()
+    hand = make_hand(R, (0.3, 0.5))
     state = None
-    for k in range(40):
-        noisy = shifted(hand, dx=float(rng.normal(0, 0.003)), dy=float(rng.normal(0, 0.003)))
-        state = tracker.update([noisy], k * DT)
-    assert state is not None
-    jitter = state.fingers[FingerId.RIGHT_INDEX].jitter
-    assert jitter is not None and 0 < jitter < 0.01
+    for k in range(90):  # 0.3 widths/s to the right, no noise
+        state = tracker.update([shifted(hand, dx=0.3 * k * DT)], k * DT)
+    fs = state.fingers[FingerId.RIGHT_INDEX]
+    assert jitter_px(fs.raw_jitter, W, H) < 0.01
+    assert jitter_px(fs.smoothed_jitter, W, H) < 0.5
+
+
+def test_smoothing_reduces_measured_jitter():
+    states = _noisy_still_run(2, 2)
+    raw, _ = _mean_jitter(states, "raw_jitter")
+    smooth, _ = _mean_jitter(states, "smoothed_jitter")
+    assert smooth < 0.5 * raw
+
+
+def test_jitter_resets_when_hand_is_lost():
+    tracker = FingerTracker(FingerTrackerConfig(jitter_window=5, lost_grace_s=0.05))
+    hand = make_hand(R)
+    for k in range(6):
+        tracker.update([hand], k * DT)
+    tracker.update([], 1.0)  # lost
+    state = tracker.update([hand], 1.0 + DT)
+    assert state.fingers[FingerId.RIGHT_INDEX].raw_jitter is None
+
+
+# --- handedness diagnostics ------------------------------------------------------
+
+
+def test_detector_label_is_kept_for_diagnosis():
+    tracker = _tracker()
+    hand = make_hand(R, (0.6, 0.5))
+    first = tracker.update([hand], 0.0)
+    assert first.hands[R].detector_label is R
+    assert not first.hands[R].label_overridden
+    flicker = tracker.update([shifted(hand, label=L)], DT)
+    # Continuity keeps RIGHT; the diagnostic records that MediaPipe said LEFT.
+    assert flicker.hands[R].status is TrackStatus.TRACKED
+    assert flicker.hands[R].detector_label is L
+    assert flicker.hands[R].label_overridden
+    assert flicker.hands[L].status is TrackStatus.LOST
+
+
+def test_published_arrays_are_read_only():
+    state = _tracker().update([make_hand(R)], 0.0)
+    with pytest.raises(ValueError):
+        state.hands[R].landmarks[0, 0] = 1.0
+    with pytest.raises(ValueError):
+        state.fingers[FingerId.RIGHT_INDEX].tip[0] = 1.0

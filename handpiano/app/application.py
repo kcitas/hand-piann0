@@ -3,19 +3,21 @@
 from __future__ import annotations
 
 import logging
+import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import replace
 
 from PySide6.QtCore import QObject, QTimer
 
 from handpiano.app.config import AppConfig
+from handpiano.app.handedness_check import HandednessCheck
 from handpiano.app.pipeline import PipelineState, TrackingPipeline
 from handpiano.camera.camera_config import CameraSettings
 from handpiano.camera.camera_manager import CameraManager, probe_cameras
-from handpiano.metrics.performance import ProcessCpuMonitor
+from handpiano.metrics.performance import CpuAccounting, CpuComponent, CpuSampler
 from handpiano.tracking.finger_tracker import FingerTracker
 from handpiano.tracking.hand_tracker import HandTracker
-from handpiano.ui.format import fmt
+from handpiano.ui.format import NA, fmt
 from handpiano.ui.main_window import MainWindow
 
 log = logging.getLogger(__name__)
@@ -24,16 +26,19 @@ SLOW_CAMERA_FPS = 15.0
 
 
 class Application(QObject):
-    def __init__(self, config: AppConfig, window: MainWindow) -> None:
+    def __init__(self, config: AppConfig, window: MainWindow, cpu: CpuAccounting | None = None) -> None:
         super().__init__()
         self.config = config
         self.window = window
         self.pipeline: TrackingPipeline | None = None
         self._last_seq = -1
         self._reported_state: str | None = None
-        self._cpu = ProcessCpuMonitor()
+        self.cpu = cpu if cpu is not None else CpuAccounting()
+        self._cpu_sampler = CpuSampler(self.cpu)
         self._probe_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="camera-probe")
         self._probe_future: Future[list[int]] | None = None
+        self.handedness_check: HandednessCheck | None = None
+        self._check_requested = False
 
         window.apply_camera_requested.connect(self.restart_camera)
         window.probe_requested.connect(self.probe_cameras)
@@ -61,6 +66,12 @@ class Application(QObject):
             self.pipeline = None
         self._probe_executor.shutdown(wait=False, cancel_futures=True)
 
+    def request_handedness_check(self) -> None:
+        """Starts the guided LEFT/RIGHT check as soon as the camera is running."""
+        self._check_requested = True
+        self.handedness_check = None
+        self.window.camera_view.set_banner("Validación LEFT/RIGHT", ["Esperando a la cámara…"])
+
     def restart_camera(self, settings: CameraSettings) -> None:
         self.config = replace(self.config, camera=settings)
         if self.pipeline is not None:
@@ -69,16 +80,20 @@ class Application(QObject):
 
     def _start_pipeline(self, settings: CameraSettings) -> None:
         detector_config = self.config.detector
+        fingers = self.config.fingers
+        fingers = replace(fingers, identity=replace(fingers.identity, mirrored_view=settings.mirror))
         self.pipeline = TrackingPipeline(
             camera=CameraManager(settings),
-            detector_factory=lambda: HandTracker(detector_config),
-            finger_tracker=FingerTracker(self.config.fingers),
+            detector_factory=lambda: HandTracker(detector_config, mirrored_input=settings.mirror),
+            finger_tracker=FingerTracker(fingers),
             mirror=settings.mirror,
+            cpu=self.cpu,
         )
         self._last_seq = -1
         self._reported_state = None
         self.window.camera_view.set_message("Iniciando cámara y detector de manos…")
-        self.window.debug_view.update_camera(None)
+        self.window.camera_view.reset_metrics()
+        self.window.debug_view.reset()
         self.pipeline.start()
 
     def probe_cameras(self) -> None:
@@ -94,6 +109,13 @@ class Application(QObject):
     # -- polling ---------------------------------------------------------------
 
     def _poll_frame(self) -> None:
+        cpu_start = time.thread_time()
+        try:
+            self._poll_frame_inner()
+        finally:
+            self.cpu.add(CpuComponent.UI, time.thread_time() - cpu_start)
+
+    def _poll_frame_inner(self) -> None:
         self._check_probe()
         pipeline = self.pipeline
         if pipeline is None:
@@ -104,6 +126,36 @@ class Application(QObject):
         if snapshot is not None and snapshot.seq != self._last_seq:
             self._last_seq = snapshot.seq
             self.window.camera_view.set_snapshot(snapshot)
+            if self.handedness_check is not None:
+                self.handedness_check.update(time.monotonic(), snapshot.state)
+        self._update_handedness_check(pipeline)
+
+    def _update_handedness_check(self, pipeline: TrackingPipeline) -> None:
+        now = time.monotonic()
+        if self._check_requested and pipeline.state == PipelineState.RUNNING:
+            self._check_requested = False
+            self.handedness_check = HandednessCheck(mirrored=self.config.camera.mirror)
+            self.handedness_check.start(now)
+        check = self.handedness_check
+        if check is None:
+            return
+        view = self.window.camera_view
+        spec, remaining, elapsed = check.current(now)
+        if spec is None:
+            if check.started_at is not None:
+                passed = check.passed()
+                title = "Validación LEFT/RIGHT: OK" if passed else "Validación LEFT/RIGHT: NO SUPERADA"
+                lines = check.summary_lines()
+                view.set_banner(title, lines, None, "#34d399" if passed else "#f87171")
+                log.info("Handedness check finished (%s): %s", "OK" if passed else "FAILED", " | ".join(lines))
+                check.started_at = None  # report once; the banner stays
+            return
+        detail = [f"{remaining:.0f} s"]
+        if spec.step in check.results:
+            r = check.results[spec.step]
+            rate = "N/A" if r.rate is None else f"{r.rate:.0%}"
+            detail.append(f"Coincidencia hasta ahora: {rate} ({r.evaluated} frames)")
+        view.set_banner(spec.instruction, detail, elapsed / spec.duration_s)
 
     def _on_state_change(self, pipeline: TrackingPipeline) -> None:
         self._reported_state = pipeline.state
@@ -131,7 +183,14 @@ class Application(QObject):
         self._start_pipeline(current)
 
     def _poll_stats(self) -> None:
-        cpu = self._cpu.sample()
+        cpu_start = time.thread_time()
+        try:
+            self._poll_stats_inner()
+        finally:
+            self.cpu.add(CpuComponent.UI, time.thread_time() - cpu_start)
+
+    def _poll_stats_inner(self) -> None:
+        cpu = self._cpu_sampler.sample()
         pipeline = self.pipeline
         if pipeline is None or pipeline.state != PipelineState.RUNNING:
             return
@@ -144,13 +203,19 @@ class Application(QObject):
         warning = ""
         if stats.camera_fps is not None and stats.camera_fps < SLOW_CAMERA_FPS:
             warning = "  ·  ⚠ cámara lenta: mejora la iluminación o baja la resolución"
-        hands = snapshot.state.hands_tracked if snapshot else 0
+        hands = str(snapshot.state.hands_tracked) if snapshot else NA
         latency = view.capture_to_paint_ms.summary()
         self.window.status_label.setText(
             f"Cámara {resolution} · {fmt(stats.camera_fps, 'fps')}   ·   "
             f"Tracking {fmt(stats.tracking_fps, 'fps')}   ·   "
-            f"Captura→pantalla p50 {fmt(latency.p50, 'ms', 0)}   ·   Manos {hands}{warning}"
+            f"Captura→pintado p50 {fmt(latency.p50, 'ms', 0)}   ·   Manos {hands}{warning}"
         )
         if self.window.lab_checkbox.isChecked():
-            self.window.debug_view.update_stats(stats, latency, view.paint_ms.summary(), cpu)
+            ui = {
+                "result_to_ui": view.result_to_ui_ms.summary(),
+                "ui_to_paint": view.ui_to_paint_ms.summary(),
+                "capture_to_paint": latency,
+                "paint": view.paint_ms.summary(),
+            }
+            self.window.debug_view.update_stats(stats, ui, cpu)
             self.window.debug_view.update_snapshot(snapshot)
