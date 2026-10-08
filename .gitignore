@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+build/
+dist/
+
+# Downloaded once with scripts/download_model.py (not committed: binary, reproducible)
+models/*.task
+models/*.part
+
+.DS_Store
