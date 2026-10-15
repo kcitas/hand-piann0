@@ -423,9 +423,16 @@ class CameraView(QWidget):
             self.update()
 
     def _draw_placement(self, painter: QPainter, target: QRectF, text: str, ok: bool) -> None:
-        font = QFont("Helvetica", 16, QFont.Weight.Bold)
+        label = ("✓ " if ok else "⚠ ") + text
+        width = target.width() - 24
+        size = 16
+        font = QFont("Helvetica", size, QFont.Weight.Bold)
+        while size > 10 and QFontMetricsF(font).horizontalAdvance(label) > width - 24:  # always fits the video
+            size -= 1
+            font = QFont("Helvetica", size, QFont.Weight.Bold)
+        label = QFontMetricsF(font).elidedText(label, Qt.TextElideMode.ElideRight, width - 24)
         height = QFontMetricsF(font).height() + 16
-        bar = QRectF(target.left() + 12, target.bottom() - height - 12, target.width() - 24, height)
+        bar = QRectF(target.left() + 12, target.bottom() - height - 12, width, height)
         color = QColor("#34d399" if ok else "#f59e0b")
         fill = QColor(color)
         fill.setAlpha(225)
@@ -434,7 +441,7 @@ class CameraView(QWidget):
         painter.drawRoundedRect(bar, 10, 10)
         painter.setPen(QColor("#070b14"))
         painter.setFont(font)
-        painter.drawText(bar, int(Qt.AlignmentFlag.AlignCenter), ("✓ " if ok else "⚠ ") + text)
+        painter.drawText(bar, int(Qt.AlignmentFlag.AlignCenter), label)
 
     def _draw_message(self, painter: QPainter, message: str) -> None:
         box = QRectF(self.rect()).adjusted(40, 40, -40, -40)

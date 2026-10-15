@@ -304,3 +304,15 @@ def test_cue_report_says_how_many_taps_were_recognised_per_finger():
     assert cue_report(results) == ["Toques reconocidos: 5/10 (50%) · notas de más: 5",
                                    "índice izq 4/5 · índice der 1/5"]
     assert cue_report([]) == []
+
+
+def test_finger_note_recordings_ask_to_bend_with_the_hands_up_and_keep_the_same_cues():
+    from handpiano.interaction.trace import PROTOCOLS, finger_note_steps
+
+    plain = PROTOCOLS["dedos"]
+    bent = finger_note_steps(plain)
+    assert [(s.name, s.duration_s, s.expected, s.cue_every_s) for s in bent] == [
+        (s.name, s.duration_s, s.expected, s.cue_every_s) for s in plain]
+    assert "LEVANTA" in bent[0].instruction and "piano dibujado" not in bent[0].instruction
+    assert bent[1].instruction.startswith("DOBLA el ÍNDICE IZQUIERDO (Fa)")
+    assert all("¡TOCA!" not in s.instruction for s in bent)

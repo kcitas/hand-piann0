@@ -28,7 +28,7 @@ import threading
 import time
 from collections import Counter
 from collections.abc import Iterator
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -183,6 +183,31 @@ INDEX_STEPS: tuple[TraceStep, ...] = (
               ()),
     *(_tap_step(f, cues=10, every=2.0, prefix="index") for f in (FingerId.LEFT_INDEX, FingerId.RIGHT_INDEX)),
 )
+
+_NOTE_ES = {0: "Do", 2: "Re", 4: "Mi", 5: "Fa", 7: "Sol", 9: "La", 11: "Si"}
+FINGER_NOTE_PREPARE = ("Prepárate: LEVANTA las dos manos, palmas hacia la cámara y dedos hacia ARRIBA. "
+                       "Espera a que la barra de abajo esté VERDE")
+
+
+def finger_note_steps(steps: tuple[TraceStep, ...]) -> tuple[TraceStep, ...]:
+    """The same steps and cues, with the instructions of finger-note mode (hands up, bend the finger).
+
+    Step names, durations and cues are unchanged, so recordings are analysed exactly the same way.
+    """
+    out = []
+    for step in steps:
+        if step.name == PREPARE:
+            step = replace(step, instruction=FINGER_NOTE_PREPARE)
+        elif len(step.expected) == 1 and step.cue_every_s:
+            finger = step.expected[0]
+            hand = "IZQUIERDO" if finger.name.startswith("LEFT") else "DERECHO"
+            note = _NOTE_ES[FINGER_NOTES[finger] % 12]
+            step = replace(step, instruction=(
+                f"DOBLA el {_FINGER_ES[finger.finger.name]} {hand} ({note}) hacia la palma en cada ¡DOBLA! "
+                "y vuelve a estirarlo (los demás dedos quietos)"))
+        out.append(step)
+    return tuple(out)
+
 
 PROTOCOLS: dict[str, tuple[TraceStep, ...]] = {"v2": V2_STEPS, "focus": FOCUS_STEPS, "keys": KEYS_STEPS,
                                                "play": PLAY_STEPS, "dedos": FINGER_STEPS, "indices": INDEX_STEPS}

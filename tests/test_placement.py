@@ -197,3 +197,10 @@ def test_finger_note_mode_tells_how_to_hold_the_hands():
     low[:, 1] += 0.25
     assert "muñeca" in assess_posture(Handedness.RIGHT, low, 0.5625, cfg)
     assert np.isfinite(hand).all()
+
+
+def test_the_same_problem_on_both_hands_is_said_once():
+    p = run({})  # no hands at all
+    assert p.messages == ("No veo las manos: ponlas enteras dentro de la imagen",)
+    p = run({Handedness.LEFT: (0.35, 0.86), Handedness.RIGHT: (0.65, 0.86)})
+    assert p.messages == ("Sube las manos: las muñecas se salen de la imagen",)

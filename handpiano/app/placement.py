@@ -86,6 +86,25 @@ def assess_hand(hand: Handedness, landmarks: np.ndarray, box: tuple[float, float
     return None
 
 
+# The same problem on both hands is said once, in plural (it has to fit in one bar over the video).
+_BOTH_HANDS = {
+    "No veo la mano {}: ponla entera dentro de la imagen": "No veo las manos: ponlas enteras dentro de la imagen",
+    "Sube la mano {}: la muñeca se sale de la imagen": "Sube las manos: las muñecas se salen de la imagen",
+    "Pon la mano {} con los dedos hacia ARRIBA": "Pon las dos manos con los dedos hacia ARRIBA",
+    "Gira la palma {} hacia la cámara y estira los dedos": "Gira las palmas hacia la cámara y estira los dedos",
+    "Acerca la mano {} a la cámara": "Acerca las manos a la cámara",
+    "Aleja la mano {} de la cámara": "Aleja las manos de la cámara",
+}
+
+
+def _merge_hands(messages: list[str]) -> tuple[str, ...]:
+    if len(messages) == 2:
+        for template, both in _BOTH_HANDS.items():
+            if messages == [template.format(HAND_NAME[Handedness.LEFT]), template.format(HAND_NAME[Handedness.RIGHT])]:
+                return (both,)
+    return tuple(messages)
+
+
 def assess_posture(hand: Handedness, landmarks: np.ndarray, aspect: float, config: PlacementConfig) -> str | None:
     """Finger-note mode: is this hand held so that bending a finger is clearly visible?"""
     name = HAND_NAME[hand]
@@ -135,7 +154,7 @@ class PlacementGuide:
                     messages.append(problem)
             elif t - self._last_seen.get(hand, -1e9) > self.config.lost_s:
                 messages.append(f"No veo la mano {HAND_NAME[hand]}: ponla entera dentro de la imagen")
-        return self._show(t, Placement(not messages, tuple(messages)))
+        return self._show(t, Placement(not messages, _merge_hands(messages)))
 
     def _show(self, t: float, current: Placement) -> Placement:
         if current == self._shown:

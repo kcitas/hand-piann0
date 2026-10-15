@@ -241,7 +241,8 @@ def main(argv: list[str] | None = None) -> int:
     app.debug_notes = args.debug_notes
     qt_app.aboutToQuit.connect(app.shutdown)
     window.show()
-    if args.lab or args.check_hands or args.check_keys or args.record_trace:
+    # Recording with finger notes: keep the video large (the player must see the hands and the posture bar).
+    if args.lab or args.check_hands or args.check_keys or (args.record_trace and not args.dedo_nota):
         window.set_lab_mode(True)
     app.start()
     if args.check_hands:

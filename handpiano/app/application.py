@@ -31,7 +31,15 @@ from handpiano.interaction.finger_presses import FINGER_NOTES, PressDetector, Pr
 from handpiano.interaction.labels import KEY_FINGERS
 from handpiano.interaction.press_detector import PressEvent
 from handpiano.interaction.tap_fusion import TapFusion
-from handpiano.interaction.trace import PROTOCOLS, TraceRecorder, cue_report, load_trace, match_cues, replay
+from handpiano.interaction.trace import (
+    PROTOCOLS,
+    TraceRecorder,
+    cue_report,
+    finger_note_steps,
+    load_trace,
+    match_cues,
+    replay,
+)
 from handpiano.metrics.performance import CpuAccounting, CpuComponent, CpuSampler
 from handpiano.tracking.finger_tracker import FingerTracker
 from handpiano.tracking.hand_tracker import HandTracker
@@ -192,7 +200,10 @@ class Application(QObject):
 
         While recording, physical key presses are logged as independent contact labels.
         """
-        self.trace = TraceRecorder(PROTOCOLS[protocol], protocol=protocol, config=self.config.presses,
+        steps = PROTOCOLS[protocol]
+        if self.config.presses.finger_notes:  # same cues; the instructions say "bend", hands up
+            steps = finger_note_steps(steps)
+        self.trace = TraceRecorder(steps, protocol=protocol, config=self.config.presses,
                                    mirrored=self.config.camera.mirror,
                                    detector={k: v for k, v in asdict(self.config.detector).items()
                                              if k != "model_path"})
@@ -396,7 +407,8 @@ class Application(QObject):
                     lines = [step.instruction, f"{self._cues_done}/{len(cue_times)}"]
                     if trace.protocol == "keys":
                         lines.append(warning or f"Teclas registradas: {trace.key_count}")
-                    self.window.camera_view.set_banner("¡TOCA!", lines, None, "#f87171" if warning else "#34d399")
+                    cue_word = "¡DOBLA!" if self.config.presses.finger_notes else "¡TOCA!"
+                    self.window.camera_view.set_banner(cue_word, lines, None, "#f87171" if warning else "#34d399")
                 elif warning:
                     self.window.camera_view.set_banner(
                         warning,
