@@ -30,8 +30,8 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from handpiano.tracking.finger_tracker import TrackingState, TrackStatus
 from handpiano.interaction.press_features import hand_scale
+from handpiano.tracking.finger_tracker import TrackingState, TrackStatus
 from handpiano.tracking.landmarks import Finger, Handedness
 
 HAND_NAME = {Handedness.LEFT: "izquierda", Handedness.RIGHT: "derecha"}
