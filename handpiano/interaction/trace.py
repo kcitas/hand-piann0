@@ -39,6 +39,7 @@ from handpiano.instrument.keyboard import KeyboardLayout, PianoKey
 from handpiano.interaction.finger_presses import FINGER_NOTES, PressEngine
 from handpiano.interaction.labels import KeyEvent, labels_from_keys, write_labels
 from handpiano.interaction.press_detector import PressConfig, PressEvent, PressInput
+from handpiano.interaction.press_features import fold_value
 from handpiano.interaction.trace_landmarks import (
     HandSample,
     sample_from_state,
@@ -391,6 +392,8 @@ def _inputs_from_rows(frame_rows: list[dict[str, str]], config: PressConfig,
     note_keys = {f: None if m is None else keys.get(m) for f, m in _note_key_names(keys).items()}
     for r in frame_rows:
         value = r.get(config.feature) or ""
+        if config.feature == "fold" and not value and r.get("flex") and r.get("bend"):
+            value = str(fold_value(float(r["flex"]), float(r["bend"])))  # recordings store flex and bend
         finger = FingerId[r["finger"]]
         tracked = r["tracked"] == "True"
         inputs[finger] = PressInput(

@@ -50,6 +50,9 @@ class PlacementConfig:
     # comfortable distance: p5–p95 0.07–0.14, median 0.11. Warn at under half / over ~2.5× that median.
     min_palm: float = 0.05
     max_palm: float = 0.28
+    # False: only "hand not seen" / "wrist leaving the image" (what the app uses in finger-note mode;
+    # the player found the orientation and distance hints too demanding).
+    check_orientation: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,6 +113,8 @@ def assess_posture(hand: Handedness, landmarks: np.ndarray, aspect: float, confi
     name = HAND_NAME[hand]
     if float(landmarks[0, 1]) > config.wrist_max_y:
         return f"Sube la mano {name}: la muñeca se sale de la imagen"
+    if not config.check_orientation:
+        return None
     palm = hand_scale(landmarks, aspect)
     if palm < config.min_palm:
         return f"Acerca la mano {name} a la cámara"

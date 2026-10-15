@@ -19,6 +19,9 @@ none is a physical measurement.
   with ``flex``, which that mode uses: a finger bending towards the camera keeps its
   joints nearly in line in the image, so this angle changes late.
   Not part of ``FEATURES`` (the candidates benchmarked for the drawn piano).
+* ``fold``   ``flex`` + ``FOLD_BEND_WEIGHT`` × ``bend``: the finger-note mode signal. A bend
+  shortens the finger in the image AND closes its joint angle; adding both keeps a bend visible
+  when the hand is not held exactly palm-to-camera (one of the two still changes).
 
 Coordinates are made isotropic first ("frame-width units": y multiplied by
 height/width) so that x, y and z share a scale.
@@ -33,6 +36,11 @@ import numpy as np
 from handpiano.tracking.landmarks import Finger, Landmark
 
 FEATURES = ("tip_y", "flex", "tip_z")
+FOLD_BEND_WEIGHT = 0.5
+
+
+def fold_value(flex: float, bend: float) -> float:
+    return flex + FOLD_BEND_WEIGHT * bend
 
 
 def hand_scale(landmarks: np.ndarray, aspect: float) -> float:
@@ -56,7 +64,8 @@ def press_features(landmarks: np.ndarray, finger: Finger, aspect: float) -> dict
         "tip_y": dy / scale,
         "flex": -math.hypot(dx, dy) / scale,
         "tip_z": -dz / scale,
-        "bend": _bend(landmarks, finger, aspect),
+        "bend": (bend := _bend(landmarks, finger, aspect)),
+        "fold": fold_value(-math.hypot(dx, dy) / scale, bend),
     }
 
 

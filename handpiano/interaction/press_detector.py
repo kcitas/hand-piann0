@@ -119,9 +119,12 @@ class PressConfig:
         mode "idle_min" (only the fingers at rest are subtracted, so bending two neighbours together is
         not cancelled as a hand movement): in free play (libre_1) "hand_low" cancelled such bends and
         played 22 notes, "idle_min" plays 33; guided 34/40 and 35/40 (was 34 and 33), with more extra
-        presses (29 and 27, was 16 and 25). One player, one camera.
+        presses (29 and 27, was 16 and 25). Signal ``fold`` (shortening + ½ × joint angle) instead of
+        ``flex`` alone, press_on 0.65 / release_off 0.325: free play 33 → 42 notes, guided 34/40 and
+        37/40 (was 34 and 35) with about the same extra presses (30 and 29). A bend then still counts
+        when the palm does not face the camera exactly. One player, one camera.
         """
-        values: dict[str, object] = {"feature": "flex", "press_on": 0.35, "release_off": 0.175, "refractory_s": 0.25,
+        values: dict[str, object] = {"feature": "fold", "press_on": 0.65, "release_off": 0.325, "refractory_s": 0.25,
                                      "min_velocity": 0.0, "common_mode": "idle_min",
                                      "finger_notes": True}
         values.update(overrides)

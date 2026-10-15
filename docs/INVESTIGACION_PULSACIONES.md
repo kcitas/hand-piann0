@@ -190,6 +190,8 @@ En `notas_3`, `press_on` de 0,30 a 0,40 da 32–33/40: un tramo estable. Se adop
 
 **Tocando libre (`libre_1`, 35 s).** Con `hand_low` sonaban 22 notas. Varios dobleces de dos dedos vecinos a la vez (medio y anular) los anulaba la resta del modo común, que los tomaba por un movimiento de toda la mano. Con `common_mode="idle_min"` (solo se restan los dedos quietos): libre 33 notas; guiadas 34/40 (+29) y 35/40 (+27), frente a 34 (+16) y 33 (+25) con `hand_low`. Adoptado `idle_min` en "dedo = nota" (el piano dibujado sigue con `hand_low`).
 
+**Señal combinada `fold` = `flex` + ½ × `bend`** (acortamiento + ángulo de la articulación media), umbral 0,65 / 0,325: guiadas 34/40 (+30) y 37/40 (+29), libre 42 notas, frente a 34 (+29), 35 (+27) y 33 con `flex` solo. Con peso 1,0 o umbrales más bajos suben las notas de más sin ganar aciertos guiados. Adoptada en "dedo = nota".
+
 **Siguientes pasos con más potencial que ajustar umbrales:**
 1. una cámara a la altura de la mesa, mirando los dedos de lado (un móvil como webcam);
 2. un gesto más visible que el toque, como doblar el dedo (ángulo de la articulación PIP);

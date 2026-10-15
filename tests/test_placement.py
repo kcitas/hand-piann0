@@ -204,3 +204,17 @@ def test_the_same_problem_on_both_hands_is_said_once():
     assert p.messages == ("No veo las manos: ponlas enteras dentro de la imagen",)
     p = run({Handedness.LEFT: (0.35, 0.86), Handedness.RIGHT: (0.65, 0.86)})
     assert p.messages == ("Sube las manos: las muñecas se salen de la imagen",)
+
+
+def test_without_orientation_checks_only_visibility_and_the_wrist_count():
+    from handpiano.app.placement import PlacementConfig, assess_posture
+
+    relaxed = PlacementConfig(check_orientation=False)
+    hand = make_hand(Handedness.RIGHT, (0.65, 0.5), scale=0.25).landmarks
+    short = hand.copy()
+    for tip, base in ((8, 5), (12, 9), (16, 13), (20, 17)):
+        short[tip, :2] = short[base, :2] + 0.3 * (short[tip, :2] - short[base, :2])
+    assert assess_posture(Handedness.RIGHT, short, 0.5625, relaxed) is None  # no "gira la palma"
+    low = hand.copy()
+    low[:, 1] += 0.25
+    assert "muñeca" in assess_posture(Handedness.RIGHT, low, 0.5625, relaxed)

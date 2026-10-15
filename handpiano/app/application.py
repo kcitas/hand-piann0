@@ -18,7 +18,7 @@ from handpiano.app.config import AppConfig
 from handpiano.app.handedness_check import HandednessCheck
 from handpiano.app.piano_controller import PianoController
 from handpiano.app.pipeline import PipelineState, TrackingPipeline, TrackingSnapshot
-from handpiano.app.placement import PlacementGuide, keyboard_box
+from handpiano.app.placement import PlacementConfig, PlacementGuide, keyboard_box
 from handpiano.app.press_sound import PressSound, describe, outcomes_by_tag, summary
 from handpiano.audio.engine import AudioEngine
 from handpiano.audio.tap_input import MicTapInput
@@ -118,7 +118,8 @@ class Application(QObject):
         self.fusion = TapFusion() if mic is not None else None
         self._fusion_held: dict[int, tuple[FingerId, ...]] = {}
         self._unmatched_reported = 0
-        self.placement = PlacementGuide()
+        # Finger-note mode: the bar only says when a hand is not seen or leaves the image.
+        self.placement = PlacementGuide(PlacementConfig(check_orientation=not config.presses.finger_notes))
         window.camera_view.set_press_threshold(config.presses.press_on)
         if config.presses.finger_notes:
             window.camera_view.set_finger_labels({f: SOLFEGE[m % 12] for f, m in FINGER_NOTES.items()})
