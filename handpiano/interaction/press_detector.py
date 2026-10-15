@@ -111,9 +111,12 @@ class PressConfig:
         press_on 0.35 / release_off 0.175 palm lengths, measured on notas_3 (guided ``dedos`` protocol,
         40 cues, 2026-10-15): 0.5 → 18/40 recognised (8 extra presses); 0.30–0.40 → 32–33/40 (18–23
         extra), a plateau, so 0.35 is not a lucky value. On recordings with a wrong posture (notas_1,
-        notas_2) 0.35 adds at most 3 extra presses. One player, one camera: re-measure with more.
+        notas_2) 0.35 adds at most 3 extra presses. Confirmed on a second, independent recording
+        (notas_4, posture right 92–96 % of the time): 33/40. refractory_s 0.25 (same finger, ≥ 0.25 s
+        between notes) removes 2–4 double triggers in both recordings without losing hits; the fastest
+        repeated note in the bundled songs is 0.375 s. One player, one camera.
         """
-        values: dict[str, object] = {"feature": "flex", "press_on": 0.35, "release_off": 0.175,
+        values: dict[str, object] = {"feature": "flex", "press_on": 0.35, "release_off": 0.175, "refractory_s": 0.25,
                                      "finger_notes": True}
         values.update(overrides)
         return cls(**values)  # type: ignore[arg-type]

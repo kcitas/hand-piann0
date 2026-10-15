@@ -184,7 +184,9 @@ Ninguna combinación de `press_on` ∈ {0,08; 0,10; 0,12}, `min_velocity` ∈ {0
 | `notas_2` | manos no vistas 91–92 % | 0/40 | 0/40 |
 | `notas_3` | manos vistas, barra de postura | 18/40 (+8) | **32/40 (+18)** |
 
-En `notas_3`, `press_on` de 0,30 a 0,40 da 32–33/40: un tramo estable. Se adopta 0,35 (suelta en 0,175). Por dedo: índices 5/5, mano derecha 5/5 en todos; medio izquierdo 2/5, anular izquierdo 1/5. Doblar un dedo es un gesto que la webcam frontal sí ve, al contrario que el toque en la mesa.
+| `notas_4` | manos bien colocadas el 92–96 % | 29/40 (+15) | **33/40 (+27)** |
+
+En `notas_3`, `press_on` de 0,30 a 0,40 da 32–33/40: un tramo estable. Se adopta 0,35 (suelta en 0,175), y `notas_4`, independiente, lo confirma con 33/40. Origen de las 27 de más en `notas_4`: 11 lejos de cualquier aviso (al colocarse), 8 dobles disparos del mismo dedo, 5 de un vecino sin el dedo pedido y 3 de un vecino junto a él. Un refractario de 0,25 s quita 2–4 en ambas grabaciones sin perder aciertos (32→33 y 33→33): adoptado. Por dedo: índices 5/5, mano derecha 5/5 en todos; medio izquierdo 2/5, anular izquierdo 1/5. Doblar un dedo es un gesto que la webcam frontal sí ve, al contrario que el toque en la mesa.
 
 **Siguientes pasos con más potencial que ajustar umbrales:**
 1. una cámara a la altura de la mesa, mirando los dedos de lado (un móvil como webcam);

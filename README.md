@@ -52,7 +52,7 @@ HandPiano sigue tus manos con la webcam y convierte sus movimientos en notas de 
 
 **Lo que hay que saber (medido, no supuesto):** con la webcam del portátil, la cámara ve las manos casi todo el tiempo (97–100 %), pero **no siempre distingue qué dedo ha tocado**.
 - **Piano dibujado:** en pruebas guiadas reconoce entre el 7 y el 22 % de los toques de un dedo concreto, según el ajuste.
-- **"Dedo = nota":** en la prueba guiada con buena postura reconoce **32 de 40 toques (80 %)**, con los dos índices y toda la mano derecha a 5/5, frente a 4 de 40 del piano dibujado en la misma prueba. Está medido con una sola persona y una sola cámara.
+- **"Dedo = nota":** en la prueba guiada con buena postura reconoce **33 de 40 toques (82 %)** en dos grabaciones distintas, frente a 4 de 40 del piano dibujado en la misma prueba. Está medido con una sola persona y una sola cámara.
 
 Tocando libremente sí suena y responde, pero no como un piano real. Los números están en [Qué se ha medido](#qué-se-ha-medido).
 
@@ -257,7 +257,7 @@ flowchart LR
 4. **Dedo → nota**: en "dedo = nota" cada dedo tiene su nota fija (Do4 … Do5). En el piano dibujado, la punta de cada dedo se lleva a coordenadas de piano y se mira qué tecla hay debajo (las negras tienen prioridad); en el piano sobre la mesa se usa una homografía con las 4 esquinas.
 5. **Pulsación**: la misma máquina de estados por dedo en los dos estilos (`IDLE → PRESS_CANDIDATE → PRESSED → RELEASE_CANDIDATE`), con una señal medida respecto al nudillo y dividida por el tamaño de la mano, así que mover la mano entera no la cambia. Una línea base sigue la postura en reposo, y se resta el movimiento común de la mano para no disparar notas al mover la mano entera.
    - **Piano dibujado:** la señal es cuánto **baja** la punta. Pulsa por encima de 0,12 tamaños de mano, con velocidad suficiente durante 2 frames, y suelta por debajo de 0,06.
-   - **"Dedo = nota":** la señal es cuánto se **acorta** el dedo en la imagen. Al doblarlo hacia una cámara que mira la palma, su longitud aparente cae de ~1,4 a menos de 1 palma. Pulsa por encima de 0,35 y suelta por debajo de 0,175, valores medidos con la prueba guiada (ver [Qué se ha medido](#qué-se-ha-medido)).
+   - **"Dedo = nota":** la señal es cuánto se **acorta** el dedo en la imagen. Al doblarlo hacia una cámara que mira la palma, su longitud aparente cae de ~1,4 a menos de 1 palma. Pulsa por encima de 0,35 y suelta por debajo de 0,175, con al menos 0,25 s entre dos notas del mismo dedo; son valores medidos con la prueba guiada (ver [Qué se ha medido](#qué-se-ha-medido)).
 6. **Sonido**: cada pulsación encola un `note_on` en el motor de audio (numpy + PortAudio vía `sounddevice`), que mezcla las voces en su propio hilo. Nada bloquea la cámara ni la interfaz.
 7. **Interfaz** (hilo principal de Qt): solo lee el último resultado y pinta vídeo, piano, barra de colocación, medidores y juego.
 
@@ -277,8 +277,9 @@ Todas las cifras salen de grabaciones reales con esta app y la webcam frontal de
 | Toques guiados reconocidos, 240 toques en 6 sesiones, detector por defecto | 18/240 (7,5 %), 56 notas de más |
 | El mejor ajuste encontrado en esas 6 sesiones | 53/240 (22 %), pero 145 notas de más |
 | Tocando libremente (≈ 2 min) | 116 notas, todas llegaron al motor de audio, ninguna se quedó pegada |
-| "Dedo = nota", prueba guiada con postura correcta (`notas_3`), umbral 0,35 | **32/40 (80 %)**, 18 notas de más. Índices izq./der. 5/5, mano derecha completa 5/5; medio y anular izquierdos 2/5 y 1/5 |
-| "Dedo = nota", la misma grabación con el umbral de partida 0,5 | 18/40 (45 %), 8 notas de más |
+| "Dedo = nota", prueba guiada con postura correcta (`notas_3`; mano izquierda poco visible) | **33/40 (82 %)**, 16 notas de más |
+| "Dedo = nota", segunda grabación (`notas_4`; las dos manos bien colocadas el 92–96 % del tiempo) | **33/40 (82 %)**, 25 notas de más; mano izquierda 18/20 |
+| "Dedo = nota", `notas_3` con el umbral de partida 0,5 | 18/40 (45 %), 8 notas de más |
 | "Dedo = nota" con mala postura (`notas_1`, `notas_2`: manos fuera de la imagen) | 0–3/40: la postura decide más que el umbral |
 
 **Lectura:**
@@ -408,7 +409,7 @@ hand-piann0/
 ## Limitaciones conocidas
 
 - **Qué dedo toca:** con una webcam frontal, el detector reconoce una minoría de los toques individuales (ver [Qué se ha medido](#qué-se-ha-medido)). El anular y el meñique son los peores.
-- **"Dedo = nota":** medido con una sola persona y cámara (32/40). El medio y el anular izquierdos son los peores, y doblar un dedo arrastra a veces al vecino (18 notas de más en 40 toques). Solo hay 8 notas (Do–Do, sin sostenidos ni pulgares).
+- **"Dedo = nota":** medido con una sola persona y cámara (33/40 en dos grabaciones). Quedan notas de más (16–25 en 40 toques): sobre todo al colocarse o entre toques, y a veces suena el dedo vecino. Solo hay 8 notas (Do–Do, sin sostenidos ni pulgares).
 - **FPS:** la webcam probada entrega ~24 fps, y eso limita todo el sistema.
 - **Latencia física:** medida hasta el motor de audio (9–18 ms), pero no hasta el oído. El procedimiento está en [docs/AUDIO.md](docs/AUDIO.md).
 - **Micrófono (`--microfono`):** experimental; en la prueba real detectó pocos toques y con unos 120 ms de retraso.
