@@ -161,6 +161,16 @@ class PressDetector:
     _wrist: dict[Handedness, tuple[float, float, float]] = field(default_factory=dict)
     _note_keys: dict[FingerId, PianoKey | None] = field(default_factory=dict)
 
+    def set_press_on(self, press_on: float) -> None:
+        """Live sensitivity (↑ / ↓ in the app): press threshold, release at half of it. Called from the
+        UI thread; the tracking thread picks the new config up on its next frame."""
+        config = replace(self.config, press_on=press_on, release_off=press_on / 2)
+        self.config = config
+        assert self._engine is not None
+        self._engine.config = config
+        for machine in self._engine.machines.values():
+            machine.config = config
+
     def __post_init__(self) -> None:
         self._engine = PressEngine(self.config)
         self._stable = StableKeys(self.layout, self.key_margin)

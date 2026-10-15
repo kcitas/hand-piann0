@@ -216,3 +216,49 @@ def test_press_to_sound_diagnostics_are_visible(qapp, sounds, caplog):
     assert len(lines) == 1 and "voz iniciada (grand" in lines[0] and "note_off encolada" in lines[0]
     app.shutdown()
     window.close()
+
+
+def test_arrow_keys_change_the_sensitivity_live(tmp_path):
+    from dataclasses import replace
+
+    from PySide6.QtCore import QEvent, Qt
+    from PySide6.QtGui import QKeyEvent
+
+    from handpiano.app.application import Application
+    from handpiano.app.config import AppConfig
+    from handpiano.audio.engine import AudioEngine
+    from handpiano.instrument.keyboard import KeyboardLayout
+    from handpiano.interaction.finger_presses import PressDetector
+    from handpiano.interaction.press_detector import PressConfig
+    from handpiano.ui.main_window import MainWindow
+
+    QApplication.instance() or QApplication([])
+    config = replace(AppConfig(), presses=PressConfig.finger_note_mode())
+    window = MainWindow(config.camera)
+    app = Application(config, window, audio=AudioEngine(sounds_dir=tmp_path / "none"))
+    app.press_detector = PressDetector(KeyboardLayout.from_octaves("C4", 2), config.presses)
+
+    def key(code):
+        app.eventFilter(window, QKeyEvent(QEvent.Type.KeyPress, code, Qt.KeyboardModifier.NoModifier))
+        app.eventFilter(window, QKeyEvent(QEvent.Type.KeyRelease, code, Qt.KeyboardModifier.NoModifier))
+
+    start = config.presses.press_on
+    key(Qt.Key.Key_Up)  # more sensitive: a smaller bend plays
+    assert app.config.presses.press_on == pytest.approx(start - 0.05)
+    assert app.press_detector.config.press_on == pytest.approx(start - 0.05)
+    assert all(m.config.release_off == pytest.approx((start - 0.05) / 2)
+               for m in app.press_detector._engine.machines.values())
+    assert window.camera_view._banner is not None and "Sensibilidad" in str(window.camera_view._banner)
+    key(Qt.Key.Key_Down)
+    key(Qt.Key.Key_Down)
+    assert app.config.presses.press_on == pytest.approx(start + 0.05)
+    for _ in range(40):
+        key(Qt.Key.Key_Up)
+    assert app.config.presses.press_on == pytest.approx(0.10)  # never below the limit
+    assert engine_notes_played(app) == 0  # arrows never play notes
+    app.shutdown()
+    window.close()
+
+
+def engine_notes_played(app):
+    return len([c for c in app.audio.mixer.pending if c[0] == "on"])

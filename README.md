@@ -161,6 +161,7 @@ La colocación importa más que cualquier ajuste. Con las muñecas fuera de la i
 - **las dos manos enteras en la imagen**, con las muñecas dentro.
 
 **"Dedo = nota" (Piano Libre y Juego):**
+- si los dedos **no suenan**, pulsa **↑** un par de veces (más sensible); si suenan notas **sin querer**, pulsa **↓**;
 - manos **levantadas**, con las **palmas mirando a la cámara** y los **dedos estirados hacia arriba**, como saludando; los codos pueden apoyarse en la mesa;
 - **dobla cada dedo del todo** hacia la palma para tocar, y vuelve a estirarlo. Un gesto a medias no cuenta.
 
@@ -189,6 +190,7 @@ Mensajes de la barra:
 | `−` / `+` | Bajar / subir volumen |
 | `A W S E D F T G Y H U J K O L P Ñ` | Notas en Piano Libre (como un teclado de piano: fila de abajo blancas, de arriba negras) |
 | `Z` / `X` | Bajar / subir una octava las notas del teclado |
+| `↑` / `↓` | **Sensibilidad en vivo**: con ↑ basta con doblar o bajar menos el dedo para que suene; con ↓ hay que moverlo más. Útil si un dedo no suena o si suenan notas sin querer |
 | `D F J K` | Carriles 1–4 en el Juego Rítmico |
 | Ratón | Clic en una tecla del piano para tocarla |
 

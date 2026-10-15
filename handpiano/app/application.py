@@ -51,6 +51,10 @@ log = logging.getLogger(__name__)
 
 SLOW_CAMERA_FPS = 15.0
 RHYTHM_KEYS = {"D": 0, "F": 1, "J": 2, "K": 3}
+# Live sensitivity (↑ / ↓): press threshold limits and step, in the units of the detector's signal.
+SENSITIVITY_STEP = 0.05
+SENSITIVITY_MIN = 0.10
+SENSITIVITY_MAX = 1.20
 SOLFEGE = {0: "Do", 2: "Re", 4: "Mi", 5: "Fa", 7: "Sol", 9: "La", 11: "Si"}
 # Finger-note mode: lanes by finger, like D F J K on a computer keyboard (left middle, left index,
 # right index, right middle); ring and pinky play the outer lanes.
@@ -82,6 +86,12 @@ class Application(QObject):
         self.config = config
         self.window = window
         self.pipeline: TrackingPipeline | None = None
+        self.press_detector: PressDetector | None = None
+        # The "Sensibilidad" banner shown by ↑ / ↓ goes away by itself.
+        self._sensitivity_banner = QTimer(self)
+        self._sensitivity_banner.setSingleShot(True)
+        self._sensitivity_banner.setInterval(2500)
+        self._sensitivity_banner.timeout.connect(lambda: self.trace is None and self.window.camera_view.set_banner(None))
         self._last_seq = -1
         self._reported_state: str | None = None
         self.cpu = cpu if cpu is not None else CpuAccounting()
@@ -168,6 +178,7 @@ class Application(QObject):
 
     def shutdown(self) -> None:
         self.audio_controller.stop()
+        self._sensitivity_banner.stop()
         self._frame_timer.stop()
         self._stats_timer.stop()
         self.press_sound.stop_all()
@@ -281,9 +292,30 @@ class Application(QObject):
                                              + (f" · pulsaciones {detail}" if detail else ""))
         self.window.trace_keys_label.setVisible(True)
 
+    def adjust_sensitivity(self, more_sensitive: bool) -> float:
+        """↑ / ↓: a finger has to move less / more to play. Returns the new press threshold."""
+        current = self.config.presses.press_on
+        step = SENSITIVITY_STEP * (-1 if more_sensitive else 1)
+        new = round(min(SENSITIVITY_MAX, max(SENSITIVITY_MIN, current + step)), 2)
+        self.config = replace(self.config, presses=replace(self.config.presses, press_on=new, release_off=new / 2))
+        if self.press_detector is not None:
+            self.press_detector.set_press_on(new)
+        self.window.camera_view.set_press_threshold(new)
+        level = round((SENSITIVITY_MAX - new) / SENSITIVITY_STEP) + 1
+        self.window.camera_view.set_banner(
+            f"Sensibilidad {level}", ["↑ más sensible (basta con doblar menos el dedo) · ↓ menos sensible"], None,
+            "#22d3ee")
+        self._sensitivity_banner.start()
+        log.info("Sensitivity: press_on %.2f", new)
+        return new
+
     def _play_key(self, event: QKeyEvent) -> bool:
         if self.piano.busy:  # calibrating / accuracy test: keys belong to them
             return False
+        if event.key() in (Qt.Key.Key_Up, Qt.Key.Key_Down):
+            if event.type() == QEvent.Type.KeyPress and not event.isAutoRepeat():
+                self.adjust_sensitivity(more_sensitive=event.key() == Qt.Key.Key_Up)
+            return True
         text = event.text().upper()
         down = event.type() == QEvent.Type.KeyPress
         if event.isAutoRepeat():  # a held key: no new note or hit, but do not let widgets type it
@@ -493,8 +525,9 @@ class Application(QObject):
             mirror=settings.mirror,
             cpu=self.cpu,
             key_mapper=self.piano.mapper,
-            press_detector=PressDetector(self.piano.layout, self.config.presses),
+            press_detector=(detector := PressDetector(self.piano.layout, self.config.presses)),
         )
+        self.press_detector = detector
         self.recent_events.clear()
         self.press_sound.stop_all()
         self.pipeline.press_listener = self._on_presses
