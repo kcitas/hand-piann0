@@ -13,6 +13,12 @@ none is a physical measurement.
   camera or the surface looks shorter.
 * ``tip_z``  MediaPipe's relative depth of the tip with respect to the knuckle,
   negated so that "towards the camera" is positive. Relative only, unitless.
+* ``bend``   how much the finger is bent at its middle joint (PIP), in the image:
+  (180° − angle knuckle–PIP–tip) / 90°. 0 = straight, 1 = bent 90°. Recorded for
+  the finger-note mode (hands facing the camera, a note = bending a finger) to compare
+  with ``flex``, which that mode uses: a finger bending towards the camera keeps its
+  joints nearly in line in the image, so this angle changes late.
+  Not part of ``FEATURES`` (the candidates benchmarked for the drawn piano).
 
 Coordinates are made isotropic first ("frame-width units": y multiplied by
 height/width) so that x, y and z share a scale.
@@ -50,4 +56,14 @@ def press_features(landmarks: np.ndarray, finger: Finger, aspect: float) -> dict
         "tip_y": dy / scale,
         "flex": -math.hypot(dx, dy) / scale,
         "tip_z": -dz / scale,
+        "bend": _bend(landmarks, finger, aspect),
     }
+
+
+def _bend(landmarks: np.ndarray, finger: Finger, aspect: float) -> float:
+    mcp, pip, _, tip = (np.array([landmarks[j][0], landmarks[j][1] * aspect]) for j in finger.joints)
+    u, v = mcp - pip, tip - pip
+    if float(np.linalg.norm(u)) < 1e-9 or float(np.linalg.norm(v)) < 1e-9:
+        return 0.0
+    angle = math.degrees(math.atan2(abs(float(u[0] * v[1] - u[1] * v[0])), float(np.dot(u, v))))
+    return (180.0 - angle) / 90.0

@@ -294,3 +294,13 @@ def test_index_protocol_asks_ten_taps_per_index_finger():
     taps = [s for s in steps if s.expected]
     assert [s.expected for s in taps] == [(FingerId.LEFT_INDEX,), (FingerId.RIGHT_INDEX,)]
     assert all(len(s.cue_times()) == 10 and s.cue_every_s == 2.0 and ALL_STEPS[s.name] is s for s in taps)
+
+
+def test_cue_report_says_how_many_taps_were_recognised_per_finger():
+    from handpiano.interaction.trace import CueResult, cue_report
+
+    results = [CueResult("LEFT_INDEX", 5, 4, 1, 2, ()), CueResult("RIGHT_INDEX", 5, 1, 4, 0, ()),
+               CueResult("LEFT_RING", 0, 0, 0, 3, ())]
+    assert cue_report(results) == ["Toques reconocidos: 5/10 (50%) · notas de más: 5",
+                                   "índice izq 4/5 · índice der 1/5"]
+    assert cue_report([]) == []

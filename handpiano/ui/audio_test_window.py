@@ -7,7 +7,7 @@ play chords. Mouse: click and hold a pad.
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import QLabel, QMainWindow, QVBoxLayout, QWidget
 
@@ -23,6 +23,8 @@ HELP = ("Teclas A W S E D F T G Y H U J K O L P Ñ: notas (acordes: varias a la 
 
 
 class AudioTestWindow(QMainWindow):
+    closed = Signal()
+
     def __init__(self, engine: AudioEngine) -> None:
         super().__init__()
         self.setWindowTitle("HandPiano · prueba de sonido")
@@ -81,4 +83,6 @@ class AudioTestWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:  # noqa: N802
         self.engine.all_notes_off()
+        self.audio.stop()
         super().closeEvent(event)
+        self.closed.emit()

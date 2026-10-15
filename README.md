@@ -2,7 +2,7 @@
 
 **Un piano virtual que se toca con las manos delante de la cámara del ordenador.**
 
-HandPiano sigue tus manos con la webcam, dibuja un piano sobre el vídeo y hace sonar la tecla que hay debajo de cada dedo cuando ese dedo baja. Suena con muestras de pianos reales (Grand, Upright y Electric) y trae un **Piano Libre** y un **Juego Rítmico** de 4 carriles con 4 canciones. Todo se procesa **en tu ordenador**: no se guarda ni se envía ninguna imagen.
+HandPiano sigue tus manos con la webcam y convierte sus movimientos en notas de piano, con muestras de pianos reales (Grand, Upright y Electric). Al abrirla, un **menú** te deja elegir cómo tocar: **Piano Libre** (cada dedo es una nota y se toca doblándolo), **Juego Rítmico** con 4 canciones, **Piano dibujado** sobre el vídeo o **Prueba de sonido**. Todo se procesa **en tu ordenador**: no se guarda ni se envía ninguna imagen.
 
 ![Python](https://img.shields.io/badge/Python-3.11–3.13-3776AB?logo=python&logoColor=white)
 ![Plataforma](https://img.shields.io/badge/plataforma-macOS%20(Apple%20Silicon)-lightgrey?logo=apple)
@@ -10,15 +10,17 @@ HandPiano sigue tus manos con la webcam, dibuja un piano sobre el vídeo y hace 
 ![Qt](https://img.shields.io/badge/UI-PySide6%20(Qt)-41CD52?logo=qt&logoColor=white)
 ![Tests](https://img.shields.io/badge/tests-pytest-0A9EDC?logo=pytest&logoColor=white)
 
+![Menú de inicio de HandPiano](docs/img/menu.png)
+
 ---
 
 ## Índice
 
 1. [Qué hace y en qué estado está](#qué-hace-y-en-qué-estado-está)
 2. [Instalación](#instalación)
-3. [Inicio rápido](#inicio-rápido)
-4. [Cómo colocarte y cómo tocar](#cómo-colocarte-y-cómo-tocar)
-5. [Modos: Piano Libre y Juego Rítmico](#modos-piano-libre-y-juego-rítmico)
+3. [Inicio rápido: el menú](#inicio-rápido-el-menú)
+4. [Los modos](#los-modos)
+5. [Cómo colocarte](#cómo-colocarte)
 6. [Controles de teclado](#controles-de-teclado)
 7. [Todas las opciones de la línea de comandos](#todas-las-opciones-de-la-línea-de-comandos)
 8. [Cómo funciona por dentro](#cómo-funciona-por-dentro)
@@ -36,16 +38,23 @@ HandPiano sigue tus manos con la webcam, dibuja un piano sobre el vídeo y hace 
 
 **Funciona:**
 
-- **Seguimiento de las dos manos** con MediaPipe Hand Landmarker: 21 puntos por mano, 8 dedos de juego (índice, medio, anular y meñique de cada mano), con identidad izquierda/derecha validada.
-- **Piano en pantalla**: 2 octavas (C4–B5) dibujadas en una posición fija del vídeo. No hace falta calibrar nada. También existe un piano "sobre la mesa", calibrado con 4 esquinas (`--piano-mesa`).
-- **Detección de pulsaciones** por dedo: una máquina de estados detecta cuándo baja un dedo y suena la tecla que tiene debajo.
-- **Guía de colocación**: una barra en la parte de abajo del vídeo se pone **verde** cuando las manos están bien colocadas y, si no, dice qué corregir ("Sube la mano derecha…").
-- **Medidor por dedo**: junto a cada punta de dedo, una barrita muestra cuánto ha bajado ese dedo; se pone verde cuando cuenta como pulsación.
+- **Menú de inicio** con los cuatro modos; desde cada modo, **☰ Menú** vuelve a él.
+- **Seguimiento de las dos manos** con MediaPipe Hand Landmarker: 21 puntos por mano y 8 dedos de juego (índice, medio, anular y meñique de cada mano), con identidad izquierda/derecha validada.
+- **Dos formas de tocar:**
+  - **Dedo = nota** (Piano Libre y Juego): cada dedo tiene su nota fija, de Do a Do, y suena al **doblarlo** con la palma hacia la cámara;
+  - **Piano dibujado**: 2 octavas (C4–B5) dibujadas sobre el vídeo; suena la tecla que hay debajo del dedo que baja.
+- **Guía en pantalla**: una barra en la parte de abajo del vídeo se pone **verde** cuando las manos están bien y, si no, dice qué corregir. En "dedo = nota" revisa la **postura** ("dedos hacia ARRIBA", "gira la palma hacia la cámara", "acerca la mano"…).
+- **Medidor por dedo**: junto a cada punta de dedo, una barrita muestra cuánto se ha movido ese dedo; se pone verde cuando cuenta como nota. En "dedo = nota", encima de cada dedo aparece su nota (Do, Re, Mi…).
 - **Sonido real**: tres pianos muestreados, motor polifónico propio, cambio de instrumento al vuelo y volumen.
 - **Juego Rítmico 4K** con 4 canciones de dominio público, puntuación, combo y precisión.
-- **Teclado y ratón como alternativa**: el piano siempre se puede tocar también con el teclado del ordenador.
+- **Pruebas guiadas que se puntúan solas**: al terminar, la app dice cuántos toques reconoció de cada dedo, para comparar posturas y posiciones de cámara sin analizar nada a mano.
+- **Teclado y ratón como alternativa**: siempre se puede tocar también con el teclado del ordenador.
 
-**Lo que hay que saber (medido, no supuesto):** con la webcam del portátil, la cámara ve las manos casi todo el tiempo (97–100 %), pero **no siempre distingue qué dedo ha tocado**. Cuando un dedo baja, en la imagen se mueve poco, y los vecinos se mueven casi lo mismo. En pruebas guiadas, el detector reconoce entre el 7 y el 22 % de los toques individuales, según el ajuste. Tocando libremente sí suena y responde, pero no como un piano real. Los números están en [Qué se ha medido](#qué-se-ha-medido).
+**Lo que hay que saber (medido, no supuesto):** con la webcam del portátil, la cámara ve las manos casi todo el tiempo (97–100 %), pero **no siempre distingue qué dedo ha tocado**.
+- **Piano dibujado:** en pruebas guiadas reconoce entre el 7 y el 22 % de los toques de un dedo concreto, según el ajuste.
+- **"Dedo = nota":** es nuevo y **todavía no está validado**. En la primera prueba la postura fue incorrecta la mitad del tiempo; sus umbrales son provisionales.
+
+Tocando libremente sí suena y responde, pero no como un piano real. Los números están en [Qué se ha medido](#qué-se-ha-medido).
 
 ---
 
@@ -76,64 +85,50 @@ Estas dos descargas son las únicas veces que la app necesita Internet. El model
 
 ---
 
-## Inicio rápido
+## Inicio rápido: el menú
 
 ```bash
 source .venv/bin/activate
 python -m handpiano
 ```
 
-1. Se abre la ventana con el vídeo de la cámara y el piano dibujado encima.
-2. Pon las **dos manos** sobre el piano dibujado y espera a que la **barra de abajo se ponga verde**.
-3. Baja un dedo con un golpe claro: la tecla de debajo se ilumina y suena.
-4. Arriba puedes cambiar a **Juego Rítmico 4K**, y en el panel lateral elegir instrumento y volumen.
+Se abre el **menú**. Haz clic en un modo para entrar. Dentro de cada modo, el botón **☰ Menú** (arriba a la izquierda) o cerrar la ventana te devuelven al menú. **Salir** cierra la app.
 
-Otros arranques útiles:
+Con una opción de modo en la línea de comandos, la app entra directamente en ese modo, sin menú:
 
 ```bash
-python -m handpiano --confianza 0.3     # sigue las manos con menos pérdidas (ver "Qué se ha medido")
-python -m handpiano --solo-indices      # solo suenan los dos índices: menos notas falsas
-python -m handpiano --audio-test        # probar el sonido sin cámara (teclado y ratón)
-python -m handpiano --lab               # con el Tracking Lab: el estado de cada dedo en directo
+python -m handpiano --dedo-nota        # Piano Libre con "dedo = nota"
+python -m handpiano --piano-mesa       # piano calibrado sobre la mesa
+python -m handpiano --audio-test       # prueba de sonido sin cámara
+python -m handpiano --lab              # piano dibujado con el Tracking Lab (estado de cada dedo en directo)
 ```
 
----
-
-## Cómo colocarte y cómo tocar
-
-La colocación importa más que cualquier ajuste del detector. Con las manos mal colocadas (muñecas fuera de la imagen), la cámara perdía las manos la mitad del tiempo; bien colocadas, las ve el 97–100 % del tiempo.
-
-- **Luz de frente**, sin una ventana detrás de ti.
-- **Las dos manos enteras en la imagen**, con las muñecas dentro. Si la barra dice *"la muñeca se sale de la imagen"*, inclina la pantalla del portátil hacia delante o sube las manos.
-- **Las puntas de los dedos sobre el piano dibujado.** La barra avisa si están por encima, por debajo o a un lado.
-- **Golpes claros**: baja el dedo 2–3 cm con decisión y vuelve a subirlo. Un roce suave no se ve en la imagen.
-- **El índice y el medio son los que mejor se detectan.** El anular y el meñique se mueven muy poco en la imagen de una webcam frontal.
-- Mira la **barrita junto a cada dedo**: si se pone verde, esa pulsación ha contado.
-
-Mensajes de la barra de colocación:
-
-| Mensaje | Qué hacer |
-| --- | --- |
-| Manos bien colocadas (verde) | Nada: puedes tocar |
-| Sube la mano X: la muñeca se sale de la imagen | Sube la mano o inclina la pantalla hacia delante |
-| Sube la mano X: las puntas están por debajo del piano | Adelanta los dedos hasta el piano dibujado |
-| Baja la mano X: las puntas están por encima del piano | Retrasa los dedos hasta el piano dibujado |
-| Mueve la mano X hacia el piano | La mano está a un lado del teclado |
-| No veo la mano X | Pon la mano entera dentro de la imagen |
+`--confianza 0.3` hace que la cámara pierda menos las manos y se puede añadir a cualquiera de ellos, también al menú.
 
 ---
 
-## Modos: Piano Libre y Juego Rítmico
+## Los modos
 
-### Piano Libre
+### 🎹 Piano Libre (dedo = nota)
 
-Cada dedo que baja sobre una tecla la hace sonar mientras el dedo siga abajo. Varios dedos a la vez suenan como acorde. La fuerza del golpe (la velocidad con que baja el dedo) decide el volumen de la nota.
+Cada dedo tiene su nota. Para tocarla, **dobla ese dedo** hacia la palma y vuelve a estirarlo; mientras está doblado, la nota sigue sonando. Varios dedos a la vez suenan como acorde.
 
-### Juego Rítmico 4K
+```
+Mano izquierda:  meñique Do  ·  anular Re  ·  medio Mi  ·  índice Fa
+Mano derecha:    índice Sol  ·  medio La  ·  anular Si  ·  meñique Do (agudo)
+```
 
-Las notas caen por 4 carriles y hay que tocarlas cuando llegan a la línea.
+La escala de Do mayor va de izquierda a derecha, como en un piano. El nombre de cada nota aparece encima de su dedo en el vídeo, y el teclado de arriba ilumina la tecla que suena. En este modo no se dibuja ningún piano sobre el vídeo, porque no hace falta.
 
-- **Con las manos:** el piano se divide en 4 zonas iguales, de izquierda a derecha carriles 1 a 4. Una pulsación de cualquier dedo dentro de una zona cuenta como golpe en su carril. No importa qué dedo: importa dónde está.
+### 🎮 Juego Rítmico
+
+Las notas caen por 4 carriles; hay que tocarlas cuando llegan a la línea.
+
+- **Con las manos ("dedo = nota"):** cada carril es un dedo, igual que D F J K en el teclado:
+  - carril 1: medio izquierdo (o anular y meñique izquierdos);
+  - carril 2: índice izquierdo;
+  - carril 3: índice derecho;
+  - carril 4: medio derecho (o anular y meñique derechos).
 - **Con el teclado:** D F J K.
 - **Juicio por tiempo:** PERFECT ±50 ms, GREAT ±100 ms, GOOD ±160 ms; fuera de eso, MISS. Al acertar suena la nota de la melodía.
 - **Canciones incluidas** (en `songs/`, dominio público, transcritas para el juego y lentas para poder tocarlas con las manos):
@@ -145,7 +140,47 @@ Las notas caen por 4 carriles y hay que tocarlas cuando llegan a la línea.
 | 3 | Cumpleaños Feliz | ~21 s |
 | 4 | Para Elisa, inicio (Beethoven) | ~25 s |
 
-**Añadir canciones:** copia archivos `.mid` o `.json` en `songs/`. El juego usa los 4 primeros en orden alfabético. Los MIDI se reparten solos en los 4 carriles, de grave a agudo. El formato JSON está en [`songs/README.md`](songs/README.md) y en [`handpiano/game/chart.py`](handpiano/game/chart.py). Usa solo canciones cuya licencia lo permita.
+**Añadir canciones:** copia archivos `.mid` o `.json` en `songs/`. El juego usa los 4 primeros en orden alfabético, y los MIDI se reparten solos en los 4 carriles, de grave a agudo. El formato JSON está en [`songs/README.md`](songs/README.md) y en [`handpiano/game/chart.py`](handpiano/game/chart.py). Usa solo canciones cuya licencia lo permita.
+
+### 🖐 Piano dibujado
+
+Un piano de 2 octavas dibujado sobre el vídeo. Con las manos sobre la mesa, **baja un dedo** encima de una tecla: suena esa tecla mientras el dedo siga abajo. La fuerza del golpe (la velocidad con que baja el dedo) decide el volumen. Dentro de este modo también se puede cambiar al Juego Rítmico con los botones de arriba; ahí el piano se divide en 4 zonas iguales, una por carril.
+
+### 🔊 Prueba de sonido
+
+Sin cámara: los tres pianos con el teclado del ordenador y el ratón. Sirve para comprobar que el audio funciona.
+
+---
+
+## Cómo colocarte
+
+La colocación importa más que cualquier ajuste. Con las muñecas fuera de la imagen, la cámara perdía las manos la mitad del tiempo; bien colocadas, las ve el 97–100 % del tiempo. **Espera siempre a que la barra de abajo esté verde.**
+
+**Para los dos estilos:**
+- **luz de frente**, sin una ventana detrás de ti;
+- **las dos manos enteras en la imagen**, con las muñecas dentro.
+
+**"Dedo = nota" (Piano Libre y Juego):**
+- manos **levantadas**, con las **palmas mirando a la cámara** y los **dedos estirados hacia arriba**, como saludando; los codos pueden apoyarse en la mesa;
+- **dobla cada dedo del todo** hacia la palma para tocar, y vuelve a estirarlo. Un gesto a medias no cuenta.
+
+**Piano dibujado:**
+- manos sobre la mesa, con las **puntas de los dedos sobre el piano dibujado**;
+- **golpes claros**: baja el dedo 2–3 cm con decisión y vuelve a subirlo;
+- **el índice y el medio son los que mejor se detectan**; el anular y el meñique se mueven muy poco en la imagen de una webcam frontal.
+
+Mensajes de la barra:
+
+| Mensaje | Modo | Qué hacer |
+| --- | --- | --- |
+| Manos bien colocadas (verde) | los dos | Nada: puedes tocar |
+| Sube la mano X: la muñeca se sale de la imagen | los dos | Sube la mano o inclina la pantalla hacia delante |
+| No veo la mano X | los dos | Pon la mano entera dentro de la imagen |
+| Pon la mano X con los dedos hacia ARRIBA | dedo = nota | Gira la mano: dedos arriba, muñeca abajo |
+| Gira la palma X hacia la cámara y estira los dedos | dedo = nota | La cámara ve los dedos "de canto" o doblados |
+| Acerca / Aleja la mano X | dedo = nota | La mano se ve demasiado pequeña o demasiado grande |
+| Sube / Baja la mano X: las puntas están por debajo / por encima del piano | piano dibujado | Lleva las puntas de los dedos al piano |
+| Mueve la mano X hacia el piano | piano dibujado | La mano está a un lado del teclado |
 
 ---
 
@@ -168,11 +203,13 @@ Las notas caen por 4 carriles y hay que tocarlas cuando llegan a la línea.
 
 | Opción | Qué hace |
 | --- | --- |
+| *(ninguna opción de modo)* | Abre el **menú** de inicio |
 | `--camera N` | Índice de la cámara (por defecto `0`) |
 | `--width W --height H` | Resolución pedida (por defecto `1280×720`) |
 | `--fps F` | FPS pedidos (por defecto `30`; la cámara puede entregar otro valor) |
 | `--no-mirror` | Vista sin espejo |
 | `--confianza C` | Confianza mínima de MediaPipe para detectar y seguir manos, entre 0 y 1 (por defecto 0.5). Más baja pierde menos las manos, pero puede ver manos donde no las hay |
+| `--dedo-nota` | Entra directamente en Piano Libre con "dedo = nota" (cada dedo una nota; se toca doblándolo) |
 | `--solo-indices` | Solo suenan los dos dedos índice; los otros dedos se ignoran |
 | `--piano-mesa` | Usa el piano calibrado sobre la mesa en vez del piano fijo en pantalla |
 | `--start-note NOTA --octaves N` | Teclado (por defecto `C4` y `2` octavas); debe empezar y terminar en tecla blanca |
@@ -208,7 +245,7 @@ flowchart LR
     B --> C[MediaPipe<br/>21 puntos/mano]
     C --> D[Mano izq./der.<br/>e identidad]
     D --> E[Outliers +<br/>One Euro]
-    E --> F[Dedo → tecla]
+    E --> F[Dedo → nota<br/>o tecla]
     F --> G[Detector de<br/>pulsaciones]
     G --> H[Motor de audio]
     G --> I[Interfaz Qt<br/>y juego]
@@ -217,8 +254,10 @@ flowchart LR
 1. **Captura** (hilo `camera-capture`): lee la cámara, refleja la imagen y deja **solo el último frame** en una ranura. Si llega uno nuevo antes de procesar el anterior, el viejo se descarta: se pierde frame rate, nunca se acumula retraso.
 2. **Detección** (hilo `tracking`): MediaPipe estima 21 puntos por mano. Con la vista espejo se invierte su etiqueta para obtener tu mano física, y una identidad temporal evita que las manos se intercambien.
 3. **Limpieza**: se descartan saltos imposibles (outliers) y se suaviza con un **One Euro Filter**. Cada dedo queda `TRACKED`, `HELD` (sin datos ≤ 120 ms) o `LOST`.
-4. **Dedo → tecla**: la punta de cada dedo se lleva a coordenadas de piano y se mira qué tecla hay debajo (las negras tienen prioridad). En el piano sobre la mesa se usa una homografía con las 4 esquinas.
-5. **Pulsación**: una máquina de estados por dedo (`IDLE → PRESS_CANDIDATE → PRESSED → RELEASE_CANDIDATE`). La señal es cuánto baja la punta respecto a su nudillo, dividido por el tamaño de la mano, así que mover la mano entera no la cambia. Pulsa si baja más de 0,12 con velocidad suficiente durante 2 frames, y suelta por debajo de 0,06. Una línea base sigue la postura en reposo, y se resta el movimiento común de la mano para no disparar notas al mover la mano entera.
+4. **Dedo → nota**: en "dedo = nota" cada dedo tiene su nota fija (Do4 … Do5). En el piano dibujado, la punta de cada dedo se lleva a coordenadas de piano y se mira qué tecla hay debajo (las negras tienen prioridad); en el piano sobre la mesa se usa una homografía con las 4 esquinas.
+5. **Pulsación**: la misma máquina de estados por dedo en los dos estilos (`IDLE → PRESS_CANDIDATE → PRESSED → RELEASE_CANDIDATE`), con una señal medida respecto al nudillo y dividida por el tamaño de la mano, así que mover la mano entera no la cambia. Una línea base sigue la postura en reposo, y se resta el movimiento común de la mano para no disparar notas al mover la mano entera.
+   - **Piano dibujado:** la señal es cuánto **baja** la punta. Pulsa por encima de 0,12 tamaños de mano, con velocidad suficiente durante 2 frames, y suelta por debajo de 0,06.
+   - **"Dedo = nota":** la señal es cuánto se **acorta** el dedo en la imagen. Al doblarlo hacia una cámara que mira la palma, su longitud aparente cae de ~1,4 a menos de 1 palma. Pulsa por encima de 0,5 y suelta por debajo de 0,25. Estos umbrales son provisionales hasta medirlos.
 6. **Sonido**: cada pulsación encola un `note_on` en el motor de audio (numpy + PortAudio vía `sounddevice`), que mezcla las voces en su propio hilo. Nada bloquea la cámara ni la interfaz.
 7. **Interfaz** (hilo principal de Qt): solo lee el último resultado y pinta vídeo, piano, barra de colocación, medidores y juego.
 
@@ -238,6 +277,7 @@ Todas las cifras salen de grabaciones reales con esta app y la webcam frontal de
 | Toques guiados reconocidos, 240 toques en 6 sesiones, detector por defecto | 18/240 (7,5 %), 56 notas de más |
 | El mejor ajuste encontrado en esas 6 sesiones | 53/240 (22 %), pero 145 notas de más |
 | Tocando libremente (≈ 2 min) | 116 notas, todas llegaron al motor de audio, ninguna se quedó pegada |
+| "Dedo = nota", primera prueba guiada (`notas_1`) | 0/40 con los umbrales de partida. La postura fue correcta solo el 33–42 % del tiempo (muñecas fuera de la imagen, dedos hacia abajo): **pendiente de repetir con buena postura** |
 
 **Lectura:**
 
@@ -247,8 +287,8 @@ Todas las cifras salen de grabaciones reales con esta app y la webcam frontal de
 
 **Lo que más podría mejorarlo, por orden:**
 
-1. **Otra posición de cámara**: a la altura de la mesa, mirando los dedos de lado, para que el movimiento de bajar el dedo se vea entero. Un móvil sirve como webcam.
-2. **Un gesto más visible que un toque**: por ejemplo, **doblar el dedo** en el aire, que cambia mucho el ángulo de sus articulaciones.
+1. **Un gesto más visible que un toque:** **doblar el dedo** con la palma hacia la cámara. Es el modo "dedo = nota", ya implementado y pendiente de validar.
+2. **Otra posición de cámara:** a la altura de la mesa, mirando los dedos de lado, para que el movimiento de bajar el dedo se vea entero. Un móvil sirve como webcam.
 3. **Una cámara de profundidad.**
 
 ---
@@ -258,8 +298,11 @@ Todas las cifras salen de grabaciones reales con esta app y la webcam frontal de
 Las grabaciones guardan **solo números** (posiciones de los puntos de la mano y estado del detector), nunca imágenes. La app se niega a sobrescribir un archivo existente.
 
 ```bash
-# Prueba guiada: 5 toques con cada dedo (~1 min 40 s); en pantalla se dice qué dedo bajar
+# Prueba guiada: 5 toques con cada dedo (~1 min 40 s); en pantalla se dice qué dedo tocar
 python -m handpiano --record-trace dedos_7.csv --trace-protocol dedos
+
+# La misma prueba en "dedo = nota" (doblando los dedos)
+python -m handpiano --dedo-nota --record-trace notas_2.csv --trace-protocol dedos
 
 # Prueba guiada solo de los índices: 10 toques con cada uno (~50 s)
 python -m handpiano --record-trace indices_1.csv --trace-protocol indices --solo-indices
@@ -275,6 +318,15 @@ python -m handpiano --record-trace tocar_5.csv --trace-protocol play
 | `play` | 30 s tocando libremente |
 | `keys` | Dedos sobre el teclado del ordenador: cada tecla real queda como etiqueta independiente |
 | `v2`, `focus` | Protocolos anteriores: avisos cada 1,5 s y dedos problemáticos cada 3 s |
+
+**Al terminar una prueba guiada (`dedos` o `indices`), la app dice cuántos toques reconoció**, en pantalla y en la terminal:
+
+```
+Toques reconocidos: 4/40 (10%) · notas de más: 9
+índice izq 2/5 · medio izq 1/5 · anular izq 0/5 · meñique izq 0/5 · índice der 0/5 · …
+```
+
+Así se pueden comparar posturas, distancias y posiciones de cámara: graba varias veces, cambiando una sola cosa cada vez, y quédate con la que más toques reconozca.
 
 Cada grabación escribe `NOMBRE.csv` (por dedo y frame), `NOMBRE.landmarks.csv` (los 21 puntos), `NOMBRE.meta.json` (ajustes usados) y, si se pulsaron teclas físicas, `NOMBRE.labels.csv`. El formato está en [docs/TRAZAS_V4_Y_ETIQUETAS.md](docs/TRAZAS_V4_Y_ETIQUETAS.md).
 
@@ -306,8 +358,9 @@ Más de 450 tests, sin cámara física: la cámara, MediaPipe y la salida de aud
 - **seguimiento:** captura, ciclo de vida de los hilos, identidad izquierda/derecha y outliers;
 - **piano:** geometría del teclado y hit testing;
 - **calibración:** homografía y calibración;
-- **pulsaciones:** detector con manos sintéticas, modo solo índices;
-- **mediciones:** grabaciones v4 y etiquetas, guía de colocación;
+- **pulsaciones:** detector con manos sintéticas, modo solo índices y modo "dedo = nota";
+- **mediciones:** grabaciones v4 y etiquetas, resumen de pruebas guiadas, guía de colocación y de postura;
+- **menú:** sus cuatro modos y la vuelta al menú, cerrando el modo sin dejar nada en marcha;
 - **audio:** carga de muestras, mezclador, motor y paso pulsación → sonido;
 - **juego:** partituras JSON y MIDI, juicio y puntuación;
 - **interfaz:** modo offscreen.
@@ -319,8 +372,8 @@ Más de 450 tests, sin cámara física: la cámara, MediaPipe y la salida de aud
 ```
 hand-piann0/
 ├── handpiano/
-│   ├── app/            Arranque y opciones (main.py), controlador (application.py), hilos (pipeline.py),
-│   │                   piano en pantalla y calibración, guía de colocación, pulsación → sonido, configuración
+│   ├── app/            Arranque, menú y opciones (main.py), controlador (application.py), hilos (pipeline.py),
+│   │                   piano en pantalla y calibración, guía de colocación y postura, pulsación → sonido
 │   ├── camera/         Apertura de la cámara, hilo de captura, ranura del último frame
 │   ├── tracking/       MediaPipe, 21 puntos, identidad izquierda/derecha, One Euro, estado de los dedos
 │   ├── instrument/     Notas y geometría del teclado
@@ -329,11 +382,11 @@ hand-piann0/
 │   ├── audio/          Instrumentos, carga de muestras, mezclador, motor de audio, micrófono
 │   ├── game/           Partituras y juego rítmico
 │   ├── metrics/        Estadísticas, FPS, CPU
-│   └── ui/             Ventana, vídeo, piano, Tracking Lab, instrumentos, juego
+│   └── ui/             Menú de inicio, ventana, vídeo, piano, Tracking Lab, instrumentos, juego
 ├── songs/              Canciones del juego (.json / .mid)
 ├── scripts/            Descargas y herramientas de medición
 ├── tests/
-├── docs/               TECNICO.md, AUDIO.md, INVESTIGACION_PULSACIONES.md, TRAZAS_V4_Y_ETIQUETAS.md
+├── docs/               TECNICO.md, AUDIO.md, INVESTIGACION_PULSACIONES.md, TRAZAS_V4_Y_ETIQUETAS.md, img/
 ├── models/             Modelo descargado (no se sube al repositorio)
 ├── sounds/             Muestras descargadas (no se suben al repositorio)
 └── pyproject.toml
@@ -353,6 +406,7 @@ hand-piann0/
 ## Limitaciones conocidas
 
 - **Qué dedo toca:** con una webcam frontal, el detector reconoce una minoría de los toques individuales (ver [Qué se ha medido](#qué-se-ha-medido)). El anular y el meñique son los peores.
+- **"Dedo = nota":** implementado pero sin validar; sus umbrales (0,5 / 0,25) son provisionales hasta repetir la prueba guiada con buena postura. Solo hay 8 notas (Do–Do, sin sostenidos ni pulgares).
 - **FPS:** la webcam probada entrega ~24 fps, y eso limita todo el sistema.
 - **Latencia física:** medida hasta el motor de audio (9–18 ms), pero no hasta el oído. El procedimiento está en [docs/AUDIO.md](docs/AUDIO.md).
 - **Micrófono (`--microfono`):** experimental; en la prueba real detectó pocos toques y con unos 120 ms de retraso.

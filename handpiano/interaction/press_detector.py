@@ -98,6 +98,24 @@ class PressConfig:
     max_press_s: float | None = None
     # Only the two index fingers play (--solo-indices); the other machines are never updated and stay IDLE.
     only_index: bool = False
+    # Finger-note mode (--dedo-nota): every finger plays its own fixed note (FINGER_NOTES), wherever it is.
+    finger_notes: bool = False
+
+    @classmethod
+    def finger_note_mode(cls, **overrides: object) -> PressConfig:
+        """Hands facing the camera, fingers up; a note = bending a finger towards the palm.
+
+        Signal ``flex`` (apparent finger length, knuckle → tip, in palm lengths, negated): bending
+        towards a camera that faces the palm foreshortens the finger from ~1.4 to well under 1 palm
+        length, while the 2D joint angle barely changes until the tip passes below the knuckle.
+        press_on 0.5 / release_off 0.25 palm lengths (about a third and a sixth of an extended
+        finger) are PROVISIONAL, until measured with
+        ``--record-trace … --trace-protocol dedos --dedo-nota``.
+        """
+        values: dict[str, object] = {"feature": "flex", "press_on": 0.5, "release_off": 0.25,
+                                     "finger_notes": True}
+        values.update(overrides)
+        return cls(**values)  # type: ignore[arg-type]
 
     @classmethod
     def legacy(cls, **overrides: object) -> PressConfig:

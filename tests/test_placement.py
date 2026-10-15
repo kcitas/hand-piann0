@@ -173,3 +173,27 @@ def test_press_meter_turns_green_on_a_real_press():
     assert pixel.green() > 150 and pixel.red() < 120, pixel.name()
     assert QColor("#34d399").green() == 0xD3
     view.close()
+
+
+def test_finger_note_mode_tells_how_to_hold_the_hands():
+    import numpy as np
+
+    from handpiano.app.placement import PlacementConfig, assess_posture
+
+    cfg = PlacementConfig()
+    hand = make_hand(Handedness.RIGHT, (0.65, 0.5), scale=0.25).landmarks  # palm ≈ 0.11 frame widths, as measured
+    assert assess_posture(Handedness.RIGHT, hand, 0.5625, cfg) is None  # palm to the camera, fingers up
+    down = hand.copy()
+    down[:, 1] = 1.0 - down[:, 1]  # fingers pointing down
+    down[:, 1] -= 0.05
+    assert "ARRIBA" in assess_posture(Handedness.RIGHT, down, 0.5625, cfg)
+    short = hand.copy()
+    for tip, base in ((8, 5), (12, 9), (16, 13), (20, 17)):
+        short[tip, :2] = short[base, :2] + 0.3 * (short[tip, :2] - short[base, :2])  # foreshortened fingers
+    assert "palma" in assess_posture(Handedness.RIGHT, short, 0.5625, cfg)
+    far = make_hand(Handedness.RIGHT, (0.65, 0.5), scale=0.03).landmarks
+    assert "Acerca" in assess_posture(Handedness.RIGHT, far, 0.5625, cfg)
+    low = hand.copy()
+    low[:, 1] += 0.25
+    assert "muñeca" in assess_posture(Handedness.RIGHT, low, 0.5625, cfg)
+    assert np.isfinite(hand).all()

@@ -61,6 +61,8 @@ class MainWindow(QMainWindow):
     calibration_key = Signal(str)
     # "piano" (Piano Libre) or "rhythm" (Juego Rítmico 4K).
     mode_changed = Signal(str)
+    # The window was closed (or "☰ Menú" pressed): the start menu shows again.
+    closed = Signal()
 
     def __init__(
         self, settings: CameraSettings, cpu: CpuAccounting | None = None, layout: KeyboardLayout | None = None
@@ -120,6 +122,12 @@ class MainWindow(QMainWindow):
         bar = QToolBar("Cámara")
         bar.setMovable(False)
         self.addToolBar(bar)
+        self.menu_button = QPushButton("☰ Menú")
+        self.menu_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.menu_button.setVisible(False)  # only when opened from the start menu
+        self.menu_button.clicked.connect(self.close)
+        self._menu_action = bar.addWidget(self.menu_button)
+        self._menu_action.setVisible(False)
         title = QLabel("  HandPiano  ")
         title.setStyleSheet("font-weight: 700; font-size: 15px;")
         bar.addWidget(title)
@@ -198,6 +206,14 @@ class MainWindow(QMainWindow):
         for index in indices:
             self.camera_combo.addItem(f"Cámara {index}", index)
         self._select_data(self.camera_combo, current if current is not None else self._settings.device_index)
+
+    def enable_menu_button(self) -> None:
+        self._menu_action.setVisible(True)
+        self.menu_button.setVisible(True)
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        super().closeEvent(event)
+        self.closed.emit()
 
     def set_mode(self, mode: str) -> None:
         if mode not in self.mode_buttons:

@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QObject, QTimer
+from shiboken6 import isValid
 
 from handpiano.audio.engine import AudioEngine
 from handpiano.audio.instruments import INSTRUMENTS
@@ -68,12 +69,18 @@ class AudioController(QObject):
         panel.volume_changed.connect(engine.set_volume)
         panel.set_volume(engine.volume)
         # The engine reports from its loader thread; the panel is refreshed from here instead.
+        self._stopped = False
         self._timer = QTimer(self)
         self._timer.setInterval(150)
         self._timer.timeout.connect(self.refresh)
         self._timer.start()
         self._test_pending: list[int] = []
         self.refresh()
+
+    def stop(self) -> None:
+        """No more panel refreshes (the window that owns the panel is closing)."""
+        self._stopped = True
+        self._timer.stop()
 
     def select(self, instrument_id: str) -> None:
         self.engine.set_instrument(instrument_id)
@@ -109,6 +116,10 @@ class AudioController(QObject):
         return False
 
     def refresh(self) -> None:
+        # The panel can be deleted before this controller (a mode closed from the start menu).
+        if self._stopped or not isValid(self.panel):
+            self.stop()
+            return
         status = self.engine.status()
         for instrument_id in INSTRUMENTS:
             error = self.engine.error(instrument_id)

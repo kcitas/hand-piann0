@@ -36,7 +36,7 @@ import numpy as np
 
 from handpiano.app.pipeline import TrackingSnapshot
 from handpiano.instrument.keyboard import KeyboardLayout, PianoKey
-from handpiano.interaction.finger_presses import PressEngine
+from handpiano.interaction.finger_presses import FINGER_NOTES, PressEngine
 from handpiano.interaction.labels import KeyEvent, labels_from_keys, write_labels
 from handpiano.interaction.press_detector import PressConfig, PressEvent, PressInput
 from handpiano.interaction.trace_landmarks import (
@@ -190,11 +190,12 @@ DEFAULT_STEPS = V2_STEPS
 ALL_STEPS: dict[str, TraceStep] = {s.name: s for s in (*V1_STEPS, *V2_STEPS, *FOCUS_STEPS, *KEYS_STEPS,
                                                          *PLAY_STEPS, *INDEX_STEPS)}
 
-# Columns up to "cue" are those of v2/v3 traces; the last four were added in format v4.
+# Columns up to "cue" are those of v2/v3 traces; "seq" … "baseline" were added in format v4, and
+# "bend" (finger-note mode signal) later in v4: older v4 files simply lack it.
 COLUMNS = (
     "t", "step", "finger", "tracked", "discontinuity", "hand_speed", "tip_y", "flex", "tip_z",
     "piano_x", "piano_y", "raw_key", "stable_key", "phase", "depth", "velocity", "events", "cue",
-    "seq", "hand_status", "common_mode", "baseline",
+    "seq", "hand_status", "common_mode", "baseline", "bend",
 )
 
 
@@ -255,7 +256,7 @@ class TraceRecorder:
                 "" if sig.raw_key is None else sig.raw_key.name, "" if sig.stable_key is None else sig.stable_key.name,
                 fp.phase.value, _f(fp.depth), _f(fp.velocity), "|".join(by_finger.get(finger, [])), cue,
                 str(snapshot.seq), "" if state is None else state.hands[finger.hand].status.name, _f(sig.common_mode),
-                _f(fp.baseline),
+                _f(fp.baseline), _f(feats.get("bend")),
             ))
         with self._lock:
             self._rows.extend(rows)
@@ -362,17 +363,26 @@ def load_trace(path: Path) -> list[dict[str, str]]:
 def _inputs_from_rows(frame_rows: list[dict[str, str]], config: PressConfig,
                       keys: dict[str, PianoKey]) -> dict[FingerId, PressInput]:
     inputs: dict[FingerId, PressInput] = {}
+    note_keys = {f: None if m is None else keys.get(m) for f, m in _note_key_names(keys).items()}
     for r in frame_rows:
         value = r.get(config.feature) or ""
-        inputs[FingerId[r["finger"]]] = PressInput(
+        finger = FingerId[r["finger"]]
+        tracked = r["tracked"] == "True"
+        inputs[finger] = PressInput(
             t=float(r["t"]),
             value=float(value) if value else None,
-            key=keys.get(r.get("stable_key") or ""),
-            tracked=r["tracked"] == "True",
+            key=(note_keys[finger] if tracked else None) if config.finger_notes
+            else keys.get(r.get("stable_key") or ""),
+            tracked=tracked,
             discontinuity=r["discontinuity"] == "True",
             hand_speed=float(r["hand_speed"]) if r["hand_speed"] else 0.0,
         )
     return inputs
+
+
+def _note_key_names(keys: dict[str, PianoKey]) -> dict[FingerId, str | None]:
+    by_midi = {k.midi: name for name, k in keys.items()}
+    return {f: by_midi.get(m) for f, m in FINGER_NOTES.items()}
 
 
 def replay_frames(rows: list[dict[str, str]], config: PressConfig, layout: KeyboardLayout
@@ -625,6 +635,23 @@ def match_cues(rows: list[dict[str, str]], config: PressConfig, layout: Keyboard
         hits = len(best)
         results.append(CueResult(finger, len(finger_cues), hits, len(finger_cues) - hits, len(presses) - hits, offsets))
     return results
+
+
+_FINGER_SHORT = {"INDEX": "índice", "MIDDLE": "medio", "RING": "anular", "PINKY": "meñique"}
+
+
+def cue_report(results: list[CueResult]) -> list[str]:
+    """What the app tells the player after a guided recording: taps recognised, per finger."""
+    asked = [r for r in results if r.cues]
+    if not asked:
+        return []
+    cues = sum(r.cues for r in asked)
+    hits = sum(r.hits for r in asked)
+    extra = sum(r.extra for r in results)
+    per_finger = " · ".join(
+        f"{_FINGER_SHORT[r.finger.split('_')[1]]} {'izq' if r.finger.startswith('LEFT') else 'der'} {r.hits}/{r.cues}"
+        for r in asked)
+    return [f"Toques reconocidos: {hits}/{cues} ({hits / cues:.0%}) · notas de más: {extra}", per_finger]
 
 
 @dataclass(frozen=True, slots=True)

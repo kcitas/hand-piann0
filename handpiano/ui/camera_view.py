@@ -68,11 +68,13 @@ class CameraView(QWidget):
         self._placement: tuple[str, bool] | None = None
         # Press meter next to each fingertip: the detector's depth against this threshold (None = hidden).
         self._press_threshold: float | None = None
+        self._finger_labels: dict = {}  # FingerId → note name drawn above the fingertip (finger-note mode)
         self._ui_received_ns: int | None = None
         self._last_painted_seq: int | None = None
         # Calibrated keyboard projected into the camera image: (key, (4, 2) normalized corners).
         # Computed once per calibration, not per frame.
         self._key_polygons: list[tuple[PianoKey, np.ndarray]] = []
+        self._show_piano = True  # False in finger-note mode: the notes are on the fingers, not on a drawn piano
         self._outline: np.ndarray | None = None
         self._target_midi: int | None = None
         # Accuracy-test target point, normalized camera coordinates.
@@ -159,7 +161,8 @@ class CameraView(QWidget):
         if self._image is not None and self._snapshot is not None:
             target = self._fit_rect(self._image.width(), self._image.height())
             painter.drawImage(target, self._image)
-            self._draw_piano_overlay(painter, target, self._snapshot)
+            if self._show_piano:
+                self._draw_piano_overlay(painter, target, self._snapshot)
             self._draw_hands(painter, target, self._snapshot)
             self._draw_calibration(painter, target)
             self._draw_target_point(painter, target)
@@ -287,6 +290,16 @@ class CameraView(QWidget):
                 fp = snapshot.presses.fingers[finger]
                 pressed = fp.phase.value in ("PRESSED", "RELEASE_CANDIDATE")
                 self._draw_meter(painter, center, meter_fraction(fp.depth, self._press_threshold), pressed, color)
+            label = self._finger_labels.get(finger)
+            if label:
+                font = QFont("Helvetica", 13, QFont.Weight.Bold)
+                painter.setFont(font)
+                box = QRectF(center.x() - 30, center.y() - 34, 60, 20)
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QColor(7, 11, 20, 170))
+                painter.drawRoundedRect(box.adjusted(8, 0, -8, 0), 6, 6)
+                painter.setPen(QColor("#ffffff"))
+                painter.drawText(box, int(Qt.AlignmentFlag.AlignCenter), label)
             if self._lab_mode:
                 painter.setPen(TEXT)
                 painter.setFont(QFont("Helvetica", 10))
@@ -374,6 +387,15 @@ class CameraView(QWidget):
             painter.drawRoundedRect(bar, 3, 3)
             painter.setBrush(color)
             painter.drawRoundedRect(QRectF(bar.left(), bar.top(), bar.width() * max(0.0, min(1.0, progress)), 6), 3, 3)
+
+    def set_piano_visible(self, visible: bool) -> None:
+        self._show_piano = visible
+        self.update()
+
+    def set_finger_labels(self, labels: dict) -> None:
+        """Finger-note mode: the note each finger plays, drawn above its fingertip."""
+        self._finger_labels = dict(labels)
+        self.update()
 
     def set_press_threshold(self, threshold: float | None) -> None:
         """Show, next to each fingertip, how far the finger is from counting as a press."""

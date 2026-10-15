@@ -14,12 +14,13 @@ os.environ.setdefault("GLOG_minloglevel", "2")
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
 from PySide6.QtGui import QIcon  # noqa: E402
-from PySide6.QtWidgets import QApplication  # noqa: E402
+from PySide6.QtWidgets import QApplication, QWidget  # noqa: E402
 
 from handpiano.app.application import Application  # noqa: E402
 from handpiano.app.config import AppConfig  # noqa: E402
 from handpiano.audio.engine import AudioEngine, NullOutput, SoundDeviceOutput  # noqa: E402
 from handpiano.instrument.keyboard import KeyboardLayout  # noqa: E402
+from handpiano.interaction.press_detector import PressConfig  # noqa: E402
 from handpiano.interaction.trace_landmarks import sidecar_paths  # noqa: E402
 from handpiano.metrics.performance import CpuAccounting  # noqa: E402
 from handpiano.ui.audio_test_window import AudioTestWindow  # noqa: E402
@@ -81,10 +82,88 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--confianza", type=float, default=None, metavar="0-1",
                         help="confianza mínima de MediaPipe para detectar y seguir las manos (por defecto 0.5); "
                              "más baja = pierde menos las manos, pero puede ver manos donde no las hay")
+    parser.add_argument("--dedo-nota", action="store_true",
+                        help="cada dedo es una nota fija (Do–Do): manos levantadas, palmas hacia la cámara, "
+                             "dedos hacia arriba; para tocar, dobla el dedo")
     parser.add_argument("--solo-indices", action="store_true",
                         help="solo tocan los dos dedos índice; los demás dedos no suenan nunca")
     parser.add_argument("-v", "--verbose", action="store_true")
     return parser.parse_args(argv)
+
+
+# Any of these opens that mode directly; without them the app starts with the menu.
+DIRECT_MODE_ARGS = ("dedo_nota", "piano_mesa", "audio_test", "lab", "check_hands", "check_keys", "record_trace",
+                    "microfono", "solo_indices")
+
+
+def _new_engine(args: argparse.Namespace) -> AudioEngine:
+    engine = AudioEngine(output=NullOutput("sonido desactivado (--no-audio)") if args.no_audio else SoundDeviceOutput())
+    engine.start()
+    engine.set_instrument(args.instrument)
+    engine.preload()
+    return engine
+
+
+def run_menu(qt_app: QApplication, args: argparse.Namespace, config: AppConfig, layout: KeyboardLayout) -> int:
+    """Start menu → one mode at a time. Closing a mode (or its "☰ Menú" button) returns to the menu."""
+    from handpiano.ui.menu_window import MenuWindow
+
+    qt_app.setQuitOnLastWindowClosed(False)
+    menu = MenuWindow()
+    current: dict[str, object] = {}  # keeps the open mode's objects alive
+
+    def back_to_menu() -> None:
+        app = current.pop("app", None)
+        if isinstance(app, Application):
+            app.shutdown()
+            app.deleteLater()
+        engine = current.pop("engine", None)
+        if isinstance(engine, AudioEngine) and app is None:  # the sound test owns its engine
+            engine.close()
+        window = current.pop("window", None)
+        if isinstance(window, QWidget):
+            window.deleteLater()
+        menu.show()
+        menu.raise_()
+
+    def open_mode(mode: str) -> None:
+        if current:
+            return
+        menu.hide()
+        engine = _new_engine(args)
+        current["engine"] = engine
+        if mode == "sonido":
+            test = AudioTestWindow(engine)
+            test.closed.connect(back_to_menu)
+            current["window"] = test
+            test.show()
+            return
+        cfg = config
+        if mode in ("libre", "juego"):  # play by bending the fingers: each finger, its own note
+            cfg = replace(config, presses=PressConfig.finger_note_mode())
+        cpu = CpuAccounting()
+        window = MainWindow(cfg.camera, cpu=cpu, layout=layout)
+        app = Application(cfg, window, cpu=cpu, audio=engine)
+        app.debug_keys = args.debug_keys
+        app.debug_notes = args.debug_notes
+        current["window"], current["app"] = window, app
+        window.enable_menu_button()
+        window.closed.connect(back_to_menu)
+        window.show()
+        if mode == "juego":
+            window.set_mode("rhythm")
+        app.start()
+
+    def quit_app() -> None:
+        app = current.get("app")
+        if isinstance(app, Application):
+            app.shutdown()
+        qt_app.quit()
+
+    menu.chosen.connect(open_mode)
+    menu.quit_requested.connect(quit_app)
+    menu.show()
+    return qt_app.exec()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -115,6 +194,9 @@ def main(argv: list[str] | None = None) -> int:
         config = replace(config, detector=replace(config.detector, min_hand_detection_confidence=c,
                                                   min_hand_presence_confidence=c, min_tracking_confidence=c))
         logging.getLogger(__name__).info("Confianza de MediaPipe: %.2f", c)
+    if args.dedo_nota:
+        config = replace(config, presses=PressConfig.finger_note_mode(only_index=config.presses.only_index))
+        logging.getLogger(__name__).info("Modo dedo = nota: dobla un dedo para tocar su nota")
     if args.solo_indices:
         config = replace(config, presses=replace(config.presses, only_index=True))
         logging.getLogger(__name__).info("Modo solo índices: solo suenan los dos dedos índice")
@@ -133,6 +215,8 @@ def main(argv: list[str] | None = None) -> int:
     qt_app = QApplication(sys.argv[:1])
     qt_app.setApplicationName("HandPiano")
     qt_app.setWindowIcon(QIcon(str(ICON_PATH)))
+    if not any(getattr(args, a) for a in DIRECT_MODE_ARGS):
+        return run_menu(qt_app, args, config, layout)
     engine = AudioEngine(output=NullOutput("sonido desactivado (--no-audio)") if args.no_audio else SoundDeviceOutput())
     engine.start()
     engine.set_instrument(args.instrument)

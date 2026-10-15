@@ -27,11 +27,11 @@ from handpiano.camera.camera_manager import CameraManager, probe_cameras
 from handpiano.game.chart import LANES, Chart, SongLibrary
 from handpiano.game.rhythm import Judgment
 from handpiano.instrument.keyboard import PianoKey
-from handpiano.interaction.finger_presses import PressDetector, PressFrame
+from handpiano.interaction.finger_presses import FINGER_NOTES, PressDetector, PressFrame
 from handpiano.interaction.labels import KEY_FINGERS
 from handpiano.interaction.press_detector import PressEvent
 from handpiano.interaction.tap_fusion import TapFusion
-from handpiano.interaction.trace import PROTOCOLS, TraceRecorder, load_trace, replay
+from handpiano.interaction.trace import PROTOCOLS, TraceRecorder, cue_report, load_trace, match_cues, replay
 from handpiano.metrics.performance import CpuAccounting, CpuComponent, CpuSampler
 from handpiano.tracking.finger_tracker import FingerTracker
 from handpiano.tracking.hand_tracker import HandTracker
@@ -43,6 +43,11 @@ log = logging.getLogger(__name__)
 
 SLOW_CAMERA_FPS = 15.0
 RHYTHM_KEYS = {"D": 0, "F": 1, "J": 2, "K": 3}
+SOLFEGE = {0: "Do", 2: "Re", 4: "Mi", 5: "Fa", 7: "Sol", 9: "La", 11: "Si"}
+# Finger-note mode: lanes by finger, like D F J K on a computer keyboard (left middle, left index,
+# right index, right middle); ring and pinky play the outer lanes.
+FINGER_LANES = {FingerId.LEFT_PINKY: 0, FingerId.LEFT_RING: 0, FingerId.LEFT_MIDDLE: 0, FingerId.LEFT_INDEX: 1,
+                FingerId.RIGHT_INDEX: 2, FingerId.RIGHT_MIDDLE: 3, FingerId.RIGHT_RING: 3, FingerId.RIGHT_PINKY: 3}
 # Trace labels identify a key by Qt's key code, not by its text: the text of a key RELEASE can be
 # empty or changed by a modifier (Option+L = "¬" on macOS), and a release that does not match its
 # press would leave the key "held" and drop every later press of it.
@@ -107,6 +112,9 @@ class Application(QObject):
         self._unmatched_reported = 0
         self.placement = PlacementGuide()
         window.camera_view.set_press_threshold(config.presses.press_on)
+        if config.presses.finger_notes:
+            window.camera_view.set_finger_labels({f: SOLFEGE[m % 12] for f, m in FINGER_NOTES.items()})
+            window.camera_view.set_piano_visible(False)
         if mic is not None:
             self.audio.note_listeners.append(mic.note_played)  # ignore our own piano for a moment
             window.piano_view.pressed_source = lambda: self._fusion_held
@@ -150,6 +158,7 @@ class Application(QObject):
         self._stats_timer.start()
 
     def shutdown(self) -> None:
+        self.audio_controller.stop()
         self._frame_timer.stop()
         self._stats_timer.stop()
         self.press_sound.stop_all()
@@ -344,7 +353,9 @@ class Application(QObject):
             return
         for event in events:
             if event.kind == "press" and event.key is not None:
-                self._lane_press(self.lane_for_key(event.key), event.t)
+                lane = (FINGER_LANES[event.finger] if self.config.presses.finger_notes
+                        else self.lane_for_key(event.key))
+                self._lane_press(lane, event.t)
         now = time.perf_counter()
         game.update(now)
         if game.finished(now):
@@ -412,9 +423,15 @@ class Application(QObject):
             return
         log.info("Press trace written: %s (%d rows, %d key events)", ", ".join(map(str, written.values())),
                  trace.row_count, trace.key_count)
-        results = replay(load_trace(self._trace_path), self.config.presses, self.piano.layout)
-        lines = [f"{r.step}: intencionadas {r.intended}, NO intencionadas {r.unintended}" for r in results
-                 if r.step != "prepare"]
+        rows = load_trace(self._trace_path)
+        if trace.protocol in ("dedos", "indices"):
+            # Guided taps, one cue every 2 s: the app itself says how many were recognised with these
+            # settings, so the player can compare postures and camera angles without any analysis.
+            lines = cue_report(match_cues(rows, self.config.presses, self.piano.layout, window_s=1.0))
+        else:
+            results = replay(rows, self.config.presses, self.piano.layout)
+            lines = [f"{r.step}: intencionadas {r.intended}, NO intencionadas {r.unintended}" for r in results
+                     if r.step != "prepare"]
         if "labels" in written:
             contacts = sum(1 for e in trace.key_events if e.down)
             lines.insert(0, f"Teclas registradas: {trace.key_count} eventos ({contacts} pulsaciones) → "
@@ -532,7 +549,9 @@ class Application(QObject):
             return
         calibration = self.piano.mapper.calibration
         box = None if calibration is None else keyboard_box(calibration.camera_points)
-        placement = self.placement.update(time.monotonic(), snapshot.state, box)
+        frame = snapshot.frame
+        aspect = frame.height / frame.width if self.config.presses.finger_notes and frame.width else None
+        placement = self.placement.update(time.monotonic(), snapshot.state, box, posture_aspect=aspect)
         self.window.camera_view.set_placement(placement.text, placement.ok)
 
     def _update_handedness_check(self, pipeline: TrackingPipeline) -> None:

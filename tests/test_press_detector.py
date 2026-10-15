@@ -309,3 +309,20 @@ def test_only_index_mode_plays_the_index_fingers_and_nothing_else():
     assert presses(only, FingerId.RIGHT_RING) == []
     assert presses(only, FingerId.RIGHT_INDEX) == [FingerId.RIGHT_INDEX]
     assert presses(only, FingerId.LEFT_INDEX) == [FingerId.LEFT_INDEX]
+
+
+def test_finger_note_mode_plays_each_fingers_own_note_by_bending_it():
+    from handpiano.interaction.finger_presses import FINGER_NOTES
+
+    def notes(finger, depth):
+        rig = Rig()
+        rig.detector = PressDetector(LAYOUT, PressConfig.finger_note_mode())
+        return [(e.finger, e.key.midi) for offsets in finger_tap(finger, depth=depth)
+                for e in rig.frame(offsets).events if e.kind == "press"]
+
+    # Bending a finger (its tip comes down towards the palm, the finger looks shorter) plays its note,
+    # wherever the hand is: no keyboard under the fingers is needed.
+    assert notes(FingerId.LEFT_PINKY, 0.06) == [(FingerId.LEFT_PINKY, FINGER_NOTES[FingerId.LEFT_PINKY])]
+    assert notes(FingerId.RIGHT_INDEX, 0.06) == [(FingerId.RIGHT_INDEX, 67)]
+    assert notes(FingerId.RIGHT_INDEX, 0.02) == []  # a twitch is not a note
+    assert sorted(FINGER_NOTES.values()) == [60, 62, 64, 65, 67, 69, 71, 72]  # C major, C4 → C5

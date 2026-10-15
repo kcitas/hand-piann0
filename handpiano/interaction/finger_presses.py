@@ -58,6 +58,19 @@ from handpiano.tracking.finger_tracker import TrackingState, TrackStatus
 from handpiano.tracking.landmarks import PLAYING_FINGERS, Finger, FingerId, Handedness, Landmark
 
 
+# Finger-note mode: one octave, C4 (left pinky) → C5 (right pinky), low to high from left to right.
+FINGER_NOTES: dict[FingerId, int] = {
+    FingerId.LEFT_PINKY: 60, FingerId.LEFT_RING: 62, FingerId.LEFT_MIDDLE: 64, FingerId.LEFT_INDEX: 65,
+    FingerId.RIGHT_INDEX: 67, FingerId.RIGHT_MIDDLE: 69, FingerId.RIGHT_RING: 71, FingerId.RIGHT_PINKY: 72,
+}
+
+
+def finger_note_keys(layout: KeyboardLayout) -> dict[FingerId, PianoKey | None]:
+    """The key each finger plays in finger-note mode (None if the keyboard does not contain it)."""
+    by_midi = {k.midi: k for k in layout.keys}
+    return {f: by_midi.get(m) for f, m in FINGER_NOTES.items()}
+
+
 class PressEngine:
     """The eight machines plus the per-hand common-mode subtraction."""
 
@@ -146,10 +159,12 @@ class PressDetector:
     _engine: PressEngine | None = None
     _stable: StableKeys | None = None
     _wrist: dict[Handedness, tuple[float, float, float]] = field(default_factory=dict)
+    _note_keys: dict[FingerId, PianoKey | None] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self._engine = PressEngine(self.config)
         self._stable = StableKeys(self.layout, self.key_margin)
+        self._note_keys = finger_note_keys(self.layout)
 
     def _hand_motion(self, hand: Handedness, landmarks, t: float, aspect: float) -> tuple[float | None, bool]:
         """(wrist speed in hand sizes/s, discontinuity) for this hand."""
@@ -188,14 +203,15 @@ class PressDetector:
             if not tracked:
                 self._stable.reset(finger)
             speed, discontinuity = hand_info.get(finger.hand, (None, False))
+            note_mode = self.config.finger_notes
             inp = PressInput(
                 t=t,
                 value=None if features is None else features[self.config.feature],
-                key=stable_key,
+                key=(self._note_keys[finger] if tracked else None) if note_mode else stable_key,
                 tracked=tracked,
                 discontinuity=discontinuity,
                 hand_speed=0.0 if speed is None else speed,
-                calibrated=calibrated,
+                calibrated=True if note_mode else calibrated,
             )
             inputs[finger] = inp
             partial[finger] = FingerSignals(tracked, features, raw_key, stable_key, speed, discontinuity)
