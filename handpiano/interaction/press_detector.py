@@ -114,9 +114,12 @@ class PressConfig:
         notas_2) 0.35 adds at most 3 extra presses. Confirmed on a second, independent recording
         (notas_4, posture right 92–96 % of the time): 33/40. refractory_s 0.25 (same finger, ≥ 0.25 s
         between notes) removes 2–4 double triggers in both recordings without losing hits; the fastest
-        repeated note in the bundled songs is 0.375 s. One player, one camera.
+        repeated note in the bundled songs is 0.375 s. No minimum speed (min_velocity 0): a slow bend
+        plays too, like the reference air-piano; on both recordings it costs nothing (33→34 and 33→33,
+        same extra presses). One player, one camera.
         """
         values: dict[str, object] = {"feature": "flex", "press_on": 0.35, "release_off": 0.175, "refractory_s": 0.25,
+                                     "min_velocity": 0.0,
                                      "finger_notes": True}
         values.update(overrides)
         return cls(**values)  # type: ignore[arg-type]
