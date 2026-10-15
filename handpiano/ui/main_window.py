@@ -74,6 +74,7 @@ class MainWindow(QMainWindow):
         # Finger-note mode replaces the 2-octave map with one key per finger (set_finger_notes).
         self.finger_keys_view = FingerKeysView()
         self._finger_notes = False
+        self._calibration_used = True  # False: piano fixed on screen, nothing to calibrate
         self.mode_stack = QStackedWidget()
         self.mode_stack.addWidget(self.piano_view)
         self.mode_stack.addWidget(self.rhythm_view)
@@ -222,9 +223,17 @@ class MainWindow(QMainWindow):
         """Finger-note mode: one key per finger instead of the 2-octave map, and a larger video
         (the player has to see the hands)."""
         self._finger_notes = enabled
-        for action in self._calibration_actions:
-            action.setVisible(not enabled)
+        self._show_calibration()
         self.set_mode(self.mode)
+
+    def set_calibration_used(self, used: bool) -> None:
+        """Only the table piano (--piano-mesa) is calibrated: otherwise its buttons are hidden."""
+        self._calibration_used = used
+        self._show_calibration()
+
+    def _show_calibration(self) -> None:
+        for action in self._calibration_actions:
+            action.setVisible(self._calibration_used and not self._finger_notes)
 
     def set_mode(self, mode: str) -> None:
         if mode not in self.mode_buttons:

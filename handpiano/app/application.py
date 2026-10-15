@@ -131,6 +131,7 @@ class Application(QObject):
         # Finger-note mode: the bar only says when a hand is not seen or leaves the image.
         self.placement = PlacementGuide(PlacementConfig(check_orientation=not config.presses.finger_notes))
         window.camera_view.set_press_threshold(config.presses.press_on)
+        window.set_calibration_used(not config.piano.screen)  # the screen piano has a fixed place
         if config.presses.finger_notes:
             window.camera_view.set_finger_labels({f: SOLFEGE[m % 12] for f, m in FINGER_NOTES.items()})
             window.camera_view.set_piano_visible(False)

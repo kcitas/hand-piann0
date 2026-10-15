@@ -68,3 +68,22 @@ def test_closing_a_mode_stops_its_instrument_panel_refresh(tmp_path, monkeypatch
     other.audio_controller.refresh()
     assert other.audio_controller._stopped
     other.shutdown()
+
+
+def test_calibration_buttons_only_for_the_table_piano(tmp_path):
+    from dataclasses import replace
+
+    from handpiano.app.application import Application
+    from handpiano.app.config import AppConfig
+    from handpiano.audio.engine import AudioEngine
+
+    QApplication.instance() or QApplication([])
+    for screen, visible in ((True, False), (False, True)):
+        config = AppConfig()
+        config = replace(config, piano=replace(config.piano, screen=screen, calibration_path=tmp_path / "c.json"))
+        window = MainWindow(config.camera)
+        app = Application(config, window, audio=AudioEngine(sounds_dir=tmp_path / "none"))
+        window.show()
+        assert window.calibrate_button.isVisible() is visible and window.forget_button.isVisible() is visible
+        app.shutdown()
+        window.close()
