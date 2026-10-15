@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
@@ -24,6 +25,9 @@ from handpiano.camera.camera_config import CameraMode
 from handpiano.camera.camera_manager import CameraError, CameraManager
 from handpiano.camera.capture_thread import CaptureThread
 from handpiano.camera.frame import Frame, LatestFrameSlot
+from handpiano.interaction.finger_presses import PressDetector, PressFrame
+from handpiano.interaction.press_detector import PressEvent
+from handpiano.mapping.key_mapper import KeyMapper, MappingState
 from handpiano.metrics.latency import RollingStats, StatsSummary
 from handpiano.metrics.performance import CpuAccounting, CpuComponent, RateCounter
 from handpiano.metrics.tracking_metrics import RollingFraction
@@ -54,6 +58,8 @@ class FrameTimestamps:
     tracking_start: int  # tracking thread took it, about to call MediaPipe
     tracking_end: int  # MediaPipe returned
     finger_state_ready: int  # identity + outliers + smoothing + finger state done
+    mapping_ready: int  # fingertips mapped to keys (equals finger_state_ready without a key mapper)
+    presses_ready: int  # press state machines updated (equals mapping_ready without a press detector)
 
     @property
     def conversion_ms(self) -> float:
@@ -72,9 +78,17 @@ class FrameTimestamps:
         return (self.finger_state_ready - self.tracking_end) / _NS_PER_MS
 
     @property
+    def mapping_ms(self) -> float:
+        return (self.mapping_ready - self.finger_state_ready) / _NS_PER_MS
+
+    @property
+    def press_ms(self) -> float:
+        return (self.presses_ready - self.mapping_ready) / _NS_PER_MS
+
+    @property
     def capture_to_result_ms(self) -> float:
-        """Frame delivered by the driver → tracker result ready. NOT an end-to-end latency."""
-        return (self.finger_state_ready - self.frame_capture) / _NS_PER_MS
+        """Frame delivered by the driver → full result (fingers, keys, presses) ready. NOT end-to-end latency."""
+        return (self.presses_ready - self.frame_capture) / _NS_PER_MS
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +97,10 @@ class TrackingSnapshot:
     frame: Frame
     state: TrackingState
     timestamps: FrameTimestamps
+    # Finger → key hover mapping; None when the pipeline has no key mapper.
+    mapping: MappingState | None = None
+    # Per-finger press state for this frame; None when the pipeline has no press detector.
+    presses: PressFrame | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,6 +111,8 @@ class PipelineStats:
     queue_wait_ms: StatsSummary
     inference_ms: StatsSummary
     processing_ms: StatsSummary
+    mapping_ms: StatsSummary
+    press_ms: StatsSummary
     capture_to_result_ms: StatsSummary
     frames_captured: int
     frames_dropped: int
@@ -122,8 +142,20 @@ class TrackingPipeline:
         finger_tracker: FingerTracker,
         mirror: bool = True,
         cpu: CpuAccounting | None = None,
+        key_mapper: KeyMapper | None = None,
+        press_detector: PressDetector | None = None,
     ) -> None:
         self._camera = camera
+        self._key_mapper = key_mapper
+        self._press_detector = press_detector
+        # Press events of every processed frame, so none is lost if the UI skips a snapshot.
+        self._events: deque[PressEvent] = deque(maxlen=512)
+        self._events_lock = threading.Lock()
+        # Called on the tracking thread with every snapshot (e.g. a trace recorder). Must be fast.
+        self.frame_listener: Callable[[TrackingSnapshot], None] | None = None
+        # Called on the tracking thread with each frame's press state as soon as the detector ran,
+        # before the snapshot is published (audio: lowest latency). Must be fast and never block.
+        self.press_listener: Callable[[PressFrame], None] | None = None
         self._detector_factory = detector_factory
         self._finger_tracker = finger_tracker
         self._mirror = mirror
@@ -144,6 +176,8 @@ class TrackingPipeline:
         self._queue_wait = RollingStats()
         self._inference = RollingStats()
         self._processing = RollingStats()
+        self._mapping = RollingStats()
+        self._press = RollingStats()
         self._capture_to_result = RollingStats()
         self._presence = {h: RollingFraction() for h in Handedness}
         self._spatial_order_ok = RollingFraction()
@@ -188,6 +222,13 @@ class TrackingPipeline:
 
     # -- reading (any thread) --------------------------------------------------
 
+    def drain_events(self) -> list[PressEvent]:
+        """Press/release/rejected events since the last call, oldest first."""
+        with self._events_lock:
+            events = list(self._events)
+            self._events.clear()
+        return events
+
     def latest_snapshot(self) -> TrackingSnapshot | None:
         with self._snapshot_lock:
             return self._snapshot
@@ -201,6 +242,8 @@ class TrackingPipeline:
             queue_wait_ms=self._queue_wait.summary(),
             inference_ms=self._inference.summary(),
             processing_ms=self._processing.summary(),
+            mapping_ms=self._mapping.summary(),
+            press_ms=self._press.summary(),
             capture_to_result_ms=self._capture_to_result.summary(),
             frames_captured=self._slot.produced,
             frames_dropped=self._slot.dropped,
@@ -267,6 +310,23 @@ class TrackingPipeline:
             cpu_1 = time.thread_time()
             state = self._finger_tracker.update(observations, frame.captured_at_ns / 1e9)
             finger_state_ready = time.perf_counter_ns()
+            mapping = None if self._key_mapper is None else self._key_mapper.map(state)
+            mapping_ready = time.perf_counter_ns()
+            presses = None
+            if self._press_detector is not None:
+                aspect = frame.height / frame.width
+                presses = self._press_detector.update(frame.captured_at_ns / 1e9, state, mapping, aspect)
+                if presses.events:
+                    with self._events_lock:
+                        self._events.extend(presses.events)
+                press_listener = self.press_listener
+                if press_listener is not None:
+                    try:
+                        press_listener(presses)
+                    except Exception:
+                        log.exception("Press listener failed; it is disabled")
+                        self.press_listener = None
+            presses_ready = time.perf_counter_ns()
             if self._cpu is not None:
                 self._cpu.add(CpuComponent.INFERENCE, cpu_1 - cpu_0)
                 self._cpu.add(CpuComponent.TRACKER, time.thread_time() - cpu_1)
@@ -277,11 +337,23 @@ class TrackingPipeline:
                 tracking_start=tracking_start,
                 tracking_end=tracking_end,
                 finger_state_ready=finger_state_ready,
+                mapping_ready=mapping_ready,
+                presses_ready=presses_ready,
             )
             self._record(timestamps, state)
             seq += 1
+            snapshot = TrackingSnapshot(
+                seq=seq, frame=frame, state=state, timestamps=timestamps, mapping=mapping, presses=presses
+            )
             with self._snapshot_lock:
-                self._snapshot = TrackingSnapshot(seq=seq, frame=frame, state=state, timestamps=timestamps)
+                self._snapshot = snapshot
+            listener = self.frame_listener
+            if listener is not None:
+                try:
+                    listener(snapshot)
+                except Exception:
+                    log.exception("Frame listener failed; it is disabled")
+                    self.frame_listener = None
 
     def _record(self, ts: FrameTimestamps, state: TrackingState) -> None:
         self._tracking_fps.tick()
@@ -289,6 +361,8 @@ class TrackingPipeline:
         self._queue_wait.add(ts.queue_wait_ms)
         self._inference.add(ts.inference_ms)
         self._processing.add(ts.processing_ms)
+        self._mapping.add(ts.mapping_ms)
+        self._press.add(ts.press_ms)
         self._capture_to_result.add(ts.capture_to_result_ms)
         hands = state.hands
         for hand, presence in self._presence.items():

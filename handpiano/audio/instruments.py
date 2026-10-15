@@ -1,0 +1,161 @@
+"""The three instruments: where every sample comes from, its licence and how it is mapped.
+
+Each instrument is a different REAL instrument recorded by its authors (no sample
+is reused or processed into another instrument):
+
+* ``grand``    Steinway Model B grand piano, Versilian Community Sample Library (VCSL), CC0 1.0.
+* ``upright``  Knight upright piano, VCSL (sampled by Simon Dalzell / Ivy Audio for VSCO 2), CC0 1.0.
+* ``electric`` 1977 Rhodes Mark I Stage 73, "jRhodes3d" by Jeff Learman, CC BY-NC 4.0
+               (attribution required, non-commercial; see ``license``).
+
+Sources are pinned to a git commit, so the bytes cannot change under us; the
+download script stores a trimmed 16-bit copy (see ``scripts/download_sounds.py``)
+and checks the pitch of every sample against the note it is mapped to.
+
+Note naming was MEASURED, not assumed (2026-10-11): Steinway "C4" sounds at
+261.8 Hz (MIDI 60.0); Knight "A3" at 441.4 Hz (MIDI 69.1, so Knight names are one
+octave below scientific pitch notation); jRhodes "D4" at 294.4 Hz (MIDI 62.0), and
+jRhodes layer 1 is the softest (RMS rises 0.22 → 0.36 from layer 1 to 5).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from urllib.parse import quote
+
+from handpiano.instrument.note import PITCH_CLASSES
+
+VCSL_COMMIT = "c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e"
+JRHODES_COMMIT = "a886e6cebf074c995a10634f82ebe4fdb90f5ca6"
+_VCSL = f"https://raw.githubusercontent.com/sgossner/VCSL/{VCSL_COMMIT}/"
+_JRHODES = f"https://raw.githubusercontent.com/jlearman/jRhodes3d-wav/{JRHODES_COMMIT}/"
+
+# Playable range covered by every instrument (C3–C7); notes outside are transposed from the
+# nearest sample, which is allowed but sounds less natural.
+RANGE = (48, 96)
+
+
+@dataclass(frozen=True, slots=True)
+class SampleSource:
+    """One recorded sample: which note it is, which velocity layer, where it comes from."""
+
+    root: int  # MIDI note the recording plays (measured naming, see module docstring)
+    layer: int  # 0 = softest
+    url: str
+
+    @property
+    def cache_name(self) -> str:
+        return f"{self.root:03d}_v{self.layer}.wav"
+
+
+@dataclass(frozen=True, slots=True)
+class Instrument:
+    id: str
+    name: str
+    description: str
+    recorded: str  # the real instrument and recording
+    source: str  # human-readable origin (project, author, URL)
+    license: str
+    attribution: str
+    samples: tuple[SampleSource, ...]
+    # Upper MIDI velocity of each layer (inclusive); the last one must be 127.
+    layer_max_velocity: tuple[int, ...]
+    # Seconds of each recording kept; the tail fades out over ``fade_s``.
+    keep_s: float = 5.0
+    fade_s: float = 1.0
+    # Release time after note_off (dampers / tine damping), seconds to -60 dB.
+    release_s: float = 0.25
+    # Velocity → gain exponent: gain = (velocity / 127) ** curve. Normalized libraries need a
+    # steeper curve to recreate dynamics; layers that already differ in level need less.
+    velocity_curve: float = 1.6
+    gain: float = 1.0
+    stereo: bool = True
+
+    @property
+    def layers(self) -> int:
+        return len(self.layer_max_velocity)
+
+
+def _steinway() -> tuple[SampleSource, ...]:
+    # Whole-tone sampled on even MIDI numbers (C, D, E, F#, G#, A#); layers vl2/vl4 of vl2–vl4.
+    out = []
+    base = "Chordophones/Zithers/Grand Piano, Steinway B/NoSus/"
+    for root in range(44, 101, 2):
+        name = f"{PITCH_CLASSES[root % 12]}{root // 12 - 1}"
+        for layer, vl in enumerate(("vl2", "vl4")):
+            out.append(SampleSource(root, layer, _VCSL + quote(f"{base}JHPiano_NoSus_Close_{name}_{vl}_rr1.wav")))
+    return tuple(out)
+
+
+def _knight() -> tuple[SampleSource, ...]:
+    # Whole-tone sampled on odd MIDI numbers from A0; names one octave below scientific notation.
+    out = []
+    base = "Chordophones/Zithers/Upright Piano, Knight/Sustains/"
+    for root in range(45, 100, 2):
+        name = f"{PITCH_CLASSES[root % 12]}{root // 12 - 2}"
+        for layer, vl in enumerate(("vl1", "vl2")):
+            out.append(SampleSource(root, layer, _VCSL + quote(f"{base}Player_{vl}_rr1_{name}.wav")))
+    return tuple(out)
+
+
+_RHODES_ROOTS = {45: "A2", 50: "D3", 55: "G3", 59: "B3", 62: "D4", 65: "F4", 71: "B4", 76: "E5", 81: "A5",
+                 86: "D6", 91: "G6", 96: "C7"}
+
+
+def _jrhodes() -> tuple[SampleSource, ...]:
+    # Layers 2, 4, 5 exist for every root (1 and 3 are missing above F4).
+    out = []
+    for root, name in _RHODES_ROOTS.items():
+        for layer, n in enumerate((2, 4, 5)):
+            out.append(SampleSource(root, layer, _JRHODES + f"jRhodes3d-mono-wav/A_{root:03d}__{name}_{n}.wav"))
+    return tuple(out)
+
+
+INSTRUMENTS: dict[str, Instrument] = {
+    "grand": Instrument(
+        id="grand",
+        name="Grand Piano",
+        description="Piano de cola Steinway B: grave profundo, resonancia larga, brillante al tocar fuerte.",
+        recorded="Steinway Model B grand piano, close microphones, no sustain pedal, 44.1 kHz / 24-bit stereo.",
+        source=f"Versilian Community Sample Library (VCSL), Versilian Studios — github.com/sgossner/VCSL @ {VCSL_COMMIT[:10]}",
+        license="CC0 1.0 Universal (public domain dedication)",
+        attribution="Steinway B samples: Versilian Community Sample Library (CC0). Attribution not required.",
+        samples=_steinway(),
+        layer_max_velocity=(80, 127),
+        release_s=0.3,
+        velocity_curve=1.7,
+        gain=0.9,
+    ),
+    "upright": Instrument(
+        id="upright",
+        name="Upright Piano",
+        description="Piano vertical Knight: más íntimo y seco, con el carácter de un piano de casa.",
+        recorded="Knight upright piano sampled by Simon Dalzell (Ivy Audio) for VSCO 2, 44.1 kHz / 24-bit stereo.",
+        source=f"Versilian Community Sample Library (VCSL) — github.com/sgossner/VCSL @ {VCSL_COMMIT[:10]}",
+        license="CC0 1.0 Universal (public domain dedication)",
+        attribution="Knight upright samples: Simon Dalzell / Ivy Audio, via VCSL (CC0). Attribution not required.",
+        samples=_knight(),
+        layer_max_velocity=(80, 127),
+        release_s=0.25,
+        # vl1 and vl2 already differ by ~10 dB.
+        velocity_curve=1.0,
+        gain=2.2,
+    ),
+    "electric": Instrument(
+        id="electric",
+        name="Electric Piano",
+        description="Rhodes Mark I Stage 73 (1977): campanas suaves y \"bark\" al tocar fuerte.",
+        recorded="1977 Rhodes Mark I Stage 73, recorded directly from the harp connector, 44.1 kHz / 16-bit mono.",
+        source=f"jRhodes3d by Jeff Learman — github.com/jlearman/jRhodes3d-wav @ {JRHODES_COMMIT[:10]}",
+        license="CC BY-NC 4.0 (samples). Non-commercial use only; commercial use needs the author's permission "
+        "(jjlearman@gmail.com). The SFZ header says 'CC-SA-BY' but the LICENSE file says CC BY-NC: the "
+        "stricter one is applied.",
+        attribution="Electric piano: jRhodes3d by Jeff Learman (CC BY-NC 4.0), trimmed to 5 s and converted.",
+        samples=_jrhodes(),
+        layer_max_velocity=(63, 100, 127),
+        release_s=0.15,
+        velocity_curve=1.0,
+        gain=0.8,
+        stereo=False,
+    ),
+}

@@ -10,13 +10,21 @@ from PySide6.QtWidgets import QFormLayout, QGroupBox, QLabel, QTableWidget, QTab
 
 from handpiano.app.pipeline import PipelineStats, TrackingSnapshot
 from handpiano.camera.camera_config import CameraMode
+from handpiano.instrument.keyboard import KeyboardLayout
+from handpiano.interaction.finger_presses import PressFrame
+from handpiano.interaction.press_detector import PressEvent
+from handpiano.mapping.key_mapper import MappingState
 from handpiano.metrics.latency import StatsSummary
 from handpiano.metrics.performance import CpuBreakdown, CpuComponent
 from handpiano.tracking.finger_tracker import jitter_px
 from handpiano.tracking.landmarks import PLAYING_FINGERS, Handedness
 from handpiano.ui.format import NA, fmt, fmt_pct
 
-FINGER_COLUMNS = ("Dedo", "Estado", "x px", "y px", "z", "vel px/s", "jitter crudo px", "jitter suav. px")
+FINGER_COLUMNS = (
+    "Dedo", "Estado", "x px", "y px", "z", "vel px/s", "jitter crudo px", "jitter suav. px", "Tecla", "Dist. centro",
+    "Pulsación", "Prof.", "Vel. puls.",
+)
+KEY_COL, DIST_COL, PRESS_COL, DEPTH_COL, PVEL_COL = 8, 9, 10, 11, 12
 
 NOT_YET_AVAILABLE = "N/A (fase posterior)"
 
@@ -31,15 +39,19 @@ CAMERA_KEYS = (
     "FPS reportado (driver)", "FPS medido", "Exposición", "Autofoco",
 )
 PIPELINE_KEYS = (
-    "FPS tracking", "Conversión (espejo+RGB)", "Espera en cola", "Inferencia", "Procesado tracker",
+    "FPS tracking", "Conversión (espejo+RGB)", "Espera en cola", "Inferencia", "Procesado tracker", "Mapeo a tecla",
     "Captura → resultado", "Resultado → UI", "UI → pintado", "Captura → pintado", "Pintado UI",
     "Frames descartados",
 )
 CPU_KEYS = ("CPU proceso", "· captura", "· inferencia (hilo tracking)", "· tracker", "· UI", "· no atribuida")
+PIANO_KEYS = (
+    "Calibración", "Teclado", "Dedos con posición", "Dentro del piano", "Fuera del piano", "Teclas con varios dedos",
+)
 TRACKING_KEYS = (
     "Manos (TRACKED)", "Score LEFT", "Score RIGHT", "Sin LEFT", "Sin RIGHT", "Orden espacial coherente",
     "Etiqueta corregida", "Outliers rechazados", "Latencia audio", "Falsos disparos",
 )
+SOUND_KEYS = ("Pulsaciones → note_on", "Motor de audio", "Liberaciones", "Última pulsación")
 
 
 def p50_p95(s: StatsSummary) -> str:
@@ -61,6 +73,8 @@ class DebugView(QWidget):
         layout.addWidget(self._group("Pipeline (medido internamente)", PIPELINE_KEYS))
         layout.addWidget(self._group("CPU (% de un núcleo)", CPU_KEYS))
         layout.addWidget(self._group("Tracking", TRACKING_KEYS))
+        layout.addWidget(self._group("Pulsación → sonido (cada pulsación con su id)", SOUND_KEYS))
+        layout.addWidget(self._group("Piano (hover, sin sonido)", PIANO_KEYS))
 
         self.table = QTableWidget(len(PLAYING_FINGERS), len(FINGER_COLUMNS))
         self.table.setHorizontalHeaderLabels(FINGER_COLUMNS)
@@ -68,6 +82,10 @@ class DebugView(QWidget):
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setMinimumHeight(300)
         layout.addWidget(self.table, stretch=1)
+        self.events_label = QLabel("Eventos de pulsación: N/A")
+        self.events_label.setWordWrap(True)
+        self.events_label.setStyleSheet("font-family: Menlo, monospace; font-size: 11px;")
+        layout.addWidget(self.events_label)
         self.reset()
 
     def _group(self, title: str, keys: tuple[str, ...]) -> QGroupBox:
@@ -94,6 +112,14 @@ class DebugView(QWidget):
             for col in range(1, len(FINGER_COLUMNS)):
                 self.table.setItem(row, col, QTableWidgetItem(NA))
         self.table.resizeColumnsToContents()
+
+    def update_sound(self, counts: dict[str, int], last: str | None) -> None:
+        """Press → sound chain. "Voz iniciada" = the mixer started the sample; not proof it was heard."""
+        self._set("Pulsaciones → note_on", f"{counts['pulsaciones']} → {counts['note_on encoladas']} encoladas"
+                  + (f" · {counts['errores']} errores" if counts["errores"] else ""))
+        self._set("Motor de audio", f"{counts['voz iniciada']} voces iniciadas · {counts['sin banco']} sin banco")
+        self._set("Liberaciones", f"{counts['liberadas']} dedos levantados → {counts['note_off encoladas']} note_off")
+        self._set("Última pulsación", last or NA)
 
     def update_camera(self, mode: CameraMode | None) -> None:
         if mode is None:
@@ -122,6 +148,7 @@ class DebugView(QWidget):
         self._set("Espera en cola", p50_p95(stats.queue_wait_ms))
         self._set("Inferencia", p50_p95(stats.inference_ms))
         self._set("Procesado tracker", p50_p95(stats.processing_ms))
+        self._set("Mapeo a tecla", p50_p95(stats.mapping_ms))
         self._set("Captura → resultado", p50_p95(stats.capture_to_result_ms))
         self._set("Resultado → UI", p50_p95(ui["result_to_ui"]))
         self._set("UI → pintado", p50_p95(ui["ui_to_paint"]))
@@ -170,3 +197,58 @@ class DebugView(QWidget):
             )
             for col, text in enumerate(cells, start=1):
                 self.table.setItem(row, col, QTableWidgetItem(text))
+
+    def update_piano(self, layout: KeyboardLayout, status: str, mapping: MappingState | None) -> None:
+        self._set("Calibración", status)
+        self._set("Teclado", f"{layout.keys[0].name}–{layout.keys[-1].name} · {len(layout.keys)} teclas")
+        if mapping is None:
+            return
+        self._set("Dedos con posición", f"{mapping.with_position}/8")
+        inside, outside = mapping.inside, mapping.outside
+        self._set("Dentro del piano", NA if inside is None else f"{inside}/8")
+        self._set("Fuera del piano", NA if outside is None else f"{outside}/8")
+        if not mapping.calibrated:
+            self._set("Teclas con varios dedos", NA)
+        else:
+            shared = [
+                f"{self._key_name(layout, midi)}: {', '.join(f.short for f in fingers)}"
+                for midi, fingers in mapping.keys_under.items()
+                if len(fingers) > 1
+            ]
+            self._set("Teclas con varios dedos", "; ".join(shared) if shared else "ninguna")
+        for row, finger in enumerate(PLAYING_FINGERS):
+            fk = mapping.fingers[finger]
+            if not mapping.calibrated or fk.piano_xy is None:
+                key_text = dist_text = NA
+            elif fk.key is None:
+                key_text, dist_text = "fuera", NA
+            else:
+                key_text = fk.key.name
+                dist_text = f"{fk.distance_to_center:.2f} teclas"
+            self.table.setItem(row, KEY_COL, QTableWidgetItem(key_text))
+            self.table.setItem(row, DIST_COL, QTableWidgetItem(dist_text))
+
+    @staticmethod
+    def _key_name(layout: KeyboardLayout, midi: int) -> str:
+        key = layout.key_by_midi(midi)
+        return NA if key is None else key.name
+
+    def update_presses(self, presses: PressFrame | None, recent: list[PressEvent]) -> None:
+        """Press state per finger (in hand-size units) and the latest events with their reason."""
+        for row, finger in enumerate(PLAYING_FINGERS):
+            fp = None if presses is None else presses.fingers[finger]
+            cells = (
+                NA if fp is None else fp.phase.value,
+                NA if fp is None else fmt(fp.depth, digits=2),
+                NA if fp is None else fmt(fp.velocity, digits=1),
+            )
+            for col, text in zip((PRESS_COL, DEPTH_COL, PVEL_COL), cells, strict=True):
+                self.table.setItem(row, col, QTableWidgetItem(text))
+        if not recent:
+            self.events_label.setText("Eventos de pulsación: ninguno todavía")
+            return
+        lines = [
+            f"{e.t % 1000:8.2f}s {e.kind:<8} {e.finger.short:<5} {('-' if e.key is None else e.key.name):<4} {e.reason}"
+            for e in reversed(recent)
+        ]
+        self.events_label.setText("Eventos de pulsación (último primero):\n" + "\n".join(lines))

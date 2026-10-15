@@ -1,0 +1,190 @@
+{
+ "format": "handpiano-chart",
+ "version": 1,
+ "title": "Himno de la Alegría",
+ "artist": "Ludwig van Beethoven",
+ "source": "Melodía de dominio público transcrita a mano para HandPiano",
+ "license": "Dominio público",
+ "notes": [
+  {
+   "t": 3.0,
+   "lane": 1,
+   "midi": 64,
+   "duration": 0.675
+  },
+  {
+   "t": 3.75,
+   "lane": 1,
+   "midi": 64,
+   "duration": 0.675
+  },
+  {
+   "t": 4.5,
+   "lane": 2,
+   "midi": 65,
+   "duration": 0.675
+  },
+  {
+   "t": 5.25,
+   "lane": 3,
+   "midi": 67,
+   "duration": 0.675
+  },
+  {
+   "t": 6.0,
+   "lane": 3,
+   "midi": 67,
+   "duration": 0.675
+  },
+  {
+   "t": 6.75,
+   "lane": 2,
+   "midi": 65,
+   "duration": 0.675
+  },
+  {
+   "t": 7.5,
+   "lane": 1,
+   "midi": 64,
+   "duration": 0.675
+  },
+  {
+   "t": 8.25,
+   "lane": 0,
+   "midi": 62,
+   "duration": 0.675
+  },
+  {
+   "t": 9.0,
+   "lane": 0,
+   "midi": 60,
+   "duration": 0.675
+  },
+  {
+   "t": 9.75,
+   "lane": 0,
+   "midi": 60,
+   "duration": 0.675
+  },
+  {
+   "t": 10.5,
+   "lane": 0,
+   "midi": 62,
+   "duration": 0.675
+  },
+  {
+   "t": 11.25,
+   "lane": 1,
+   "midi": 64,
+   "duration": 0.675
+  },
+  {
+   "t": 12.0,
+   "lane": 1,
+   "midi": 64,
+   "duration": 1.012
+  },
+  {
+   "t": 13.125,
+   "lane": 0,
+   "midi": 62,
+   "duration": 0.338
+  },
+  {
+   "t": 13.5,
+   "lane": 0,
+   "midi": 62,
+   "duration": 1.35
+  },
+  {
+   "t": 15.0,
+   "lane": 1,
+   "midi": 64,
+   "duration": 0.675
+  },
+  {
+   "t": 15.75,
+   "lane": 1,
+   "midi": 64,
+   "duration": 0.675
+  },
+  {
+   "t": 16.5,
+   "lane": 2,
+   "midi": 65,
+   "duration": 0.675
+  },
+  {
+   "t": 17.25,
+   "lane": 3,
+   "midi": 67,
+   "duration": 0.675
+  },
+  {
+   "t": 18.0,
+   "lane": 3,
+   "midi": 67,
+   "duration": 0.675
+  },
+  {
+   "t": 18.75,
+   "lane": 2,
+   "midi": 65,
+   "duration": 0.675
+  },
+  {
+   "t": 19.5,
+   "lane": 1,
+   "midi": 64,
+   "duration": 0.675
+  },
+  {
+   "t": 20.25,
+   "lane": 0,
+   "midi": 62,
+   "duration": 0.675
+  },
+  {
+   "t": 21.0,
+   "lane": 0,
+   "midi": 60,
+   "duration": 0.675
+  },
+  {
+   "t": 21.75,
+   "lane": 0,
+   "midi": 60,
+   "duration": 0.675
+  },
+  {
+   "t": 22.5,
+   "lane": 0,
+   "midi": 62,
+   "duration": 0.675
+  },
+  {
+   "t": 23.25,
+   "lane": 1,
+   "midi": 64,
+   "duration": 0.675
+  },
+  {
+   "t": 24.0,
+   "lane": 0,
+   "midi": 62,
+   "duration": 1.012
+  },
+  {
+   "t": 25.125,
+   "lane": 0,
+   "midi": 60,
+   "duration": 0.338
+  },
+  {
+   "t": 25.5,
+   "lane": 0,
+   "midi": 60,
+   "duration": 1.35
+  }
+ ]
+}

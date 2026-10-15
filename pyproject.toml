@@ -16,6 +16,9 @@ dependencies = [
     # Essentials only: QtWidgets/QtGui/QtCore. The full "PySide6" meta-package adds
     # ~500 MB including QtWebEngine (a Chromium), which this app does not use.
     "PySide6-Essentials>=6.6",
+    # Audio output (PortAudio). Already installed as a MediaPipe dependency; declared because
+    # handpiano.audio uses it directly. QtMultimedia is not in PySide6-Essentials.
+    "sounddevice>=0.5",
 ]
 
 [project.optional-dependencies]

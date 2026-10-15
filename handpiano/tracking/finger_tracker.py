@@ -88,6 +88,11 @@ class HandState:
     detector_label: Handedness | None
     # Outliers rejected for this hand since the pipeline started.
     rejected_outliers: int
+    # The observation assigned to this hand THIS frame, unsmoothed, before outlier
+    # rejection (None if the detector reported no hand for it). For traces.
+    observation: HandObservation | None = None
+    # True if ``observation`` was rejected as an outlier this frame.
+    outlier_rejected: bool = False
 
     @property
     def label_overridden(self) -> bool:
@@ -153,21 +158,23 @@ class _HandTrack:
 
     def update(self, obs: HandObservation | None, t: float) -> HandState:
         detector_label = None if obs is None else obs.handedness
-        if obs is not None and self._is_outlier(obs, t):
+        observed = obs
+        rejected = obs is not None and self._is_outlier(obs, t)
+        if rejected:
             obs = None
 
         if obs is None:
             if self.last_good_t is not None and t - self.last_good_t <= self.config.lost_grace_s:
-                return self._state(TrackStatus.HELD, detector_label)
+                return self._state(TrackStatus.HELD, detector_label, observed, rejected)
             self._reset()
-            return self._state(TrackStatus.LOST, detector_label)
+            return self._state(TrackStatus.LOST, detector_label, observed, rejected)
 
         raw = obs.landmarks.astype(np.float64)
         smoothed = _read_only(self.filter(raw, t))
         self._update_velocity(smoothed, t)
         self.history.append((t, raw[self._tip_indices, :2], smoothed[self._tip_indices, :2]))
         self.smoothed, self.last_raw, self.last_good_t, self.score = smoothed, raw, t, obs.score
-        return self._state(TrackStatus.TRACKED, detector_label)
+        return self._state(TrackStatus.TRACKED, detector_label, observed)
 
     def _is_outlier(self, obs: HandObservation, t: float) -> bool:
         if self.last_raw is None or self.last_good_t is None:
@@ -206,7 +213,8 @@ class _HandTrack:
         self.consecutive_outliers = 0
         self.history.clear()
 
-    def _state(self, status: TrackStatus, detector_label: Handedness | None) -> HandState:
+    def _state(self, status: TrackStatus, detector_label: Handedness | None,
+               observation: HandObservation | None = None, outlier_rejected: bool = False) -> HandState:
         return HandState(
             hand=self.hand,
             status=status,
@@ -214,6 +222,8 @@ class _HandTrack:
             score=self.score,
             detector_label=detector_label,
             rejected_outliers=self.rejected_outliers,
+            observation=observation,
+            outlier_rejected=outlier_rejected,
         )
 
     def _jitter(self) -> tuple[np.ndarray, np.ndarray] | None:

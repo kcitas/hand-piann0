@@ -40,7 +40,7 @@ def _snapshot(seq: int = 1) -> TrackingSnapshot:
         seq=seq,
         frame=Frame(index=seq, image=image, captured_at_ns=0, published_at_ns=1),
         state=state,
-        timestamps=FrameTimestamps(0, 1, 2, 3, 4),
+        timestamps=FrameTimestamps(0, 1, 2, 3, 4, 5, 6),
     )
 
 
@@ -52,6 +52,8 @@ def _empty_stats(**overrides) -> PipelineStats:
         queue_wait_ms=EMPTY_SUMMARY,
         inference_ms=EMPTY_SUMMARY,
         processing_ms=EMPTY_SUMMARY,
+        mapping_ms=EMPTY_SUMMARY,
+        press_ms=EMPTY_SUMMARY,
         capture_to_result_ms=EMPTY_SUMMARY,
         frames_captured=0,
         frames_dropped=0,
@@ -192,6 +194,9 @@ class _FakePipeline:
 
     def latest_snapshot(self):
         return self.snapshot
+
+    def drain_events(self):
+        return []
 
     def stop(self):
         return True

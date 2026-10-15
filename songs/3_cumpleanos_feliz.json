@@ -1,0 +1,160 @@
+{
+ "format": "handpiano-chart",
+ "version": 1,
+ "title": "Cumpleaños Feliz",
+ "artist": "Mildred y Patty Hill (dominio público)",
+ "source": "Melodía de dominio público transcrita a mano para HandPiano",
+ "license": "Dominio público",
+ "notes": [
+  {
+   "t": 3.0,
+   "lane": 0,
+   "midi": 67,
+   "duration": 0.338
+  },
+  {
+   "t": 3.375,
+   "lane": 0,
+   "midi": 67,
+   "duration": 0.338
+  },
+  {
+   "t": 3.75,
+   "lane": 0,
+   "midi": 69,
+   "duration": 0.675
+  },
+  {
+   "t": 4.5,
+   "lane": 0,
+   "midi": 67,
+   "duration": 0.675
+  },
+  {
+   "t": 5.25,
+   "lane": 1,
+   "midi": 72,
+   "duration": 0.675
+  },
+  {
+   "t": 6.0,
+   "lane": 1,
+   "midi": 71,
+   "duration": 1.35
+  },
+  {
+   "t": 7.5,
+   "lane": 0,
+   "midi": 67,
+   "duration": 0.338
+  },
+  {
+   "t": 7.875,
+   "lane": 0,
+   "midi": 67,
+   "duration": 0.338
+  },
+  {
+   "t": 8.25,
+   "lane": 0,
+   "midi": 69,
+   "duration": 0.675
+  },
+  {
+   "t": 9.0,
+   "lane": 0,
+   "midi": 67,
+   "duration": 0.675
+  },
+  {
+   "t": 9.75,
+   "lane": 2,
+   "midi": 74,
+   "duration": 0.675
+  },
+  {
+   "t": 10.5,
+   "lane": 1,
+   "midi": 72,
+   "duration": 1.35
+  },
+  {
+   "t": 12.0,
+   "lane": 0,
+   "midi": 67,
+   "duration": 0.338
+  },
+  {
+   "t": 12.375,
+   "lane": 0,
+   "midi": 67,
+   "duration": 0.338
+  },
+  {
+   "t": 12.75,
+   "lane": 3,
+   "midi": 79,
+   "duration": 0.675
+  },
+  {
+   "t": 13.5,
+   "lane": 2,
+   "midi": 76,
+   "duration": 0.675
+  },
+  {
+   "t": 14.25,
+   "lane": 1,
+   "midi": 72,
+   "duration": 0.675
+  },
+  {
+   "t": 15.0,
+   "lane": 1,
+   "midi": 71,
+   "duration": 0.675
+  },
+  {
+   "t": 15.75,
+   "lane": 0,
+   "midi": 69,
+   "duration": 1.35
+  },
+  {
+   "t": 17.25,
+   "lane": 3,
+   "midi": 77,
+   "duration": 0.338
+  },
+  {
+   "t": 17.625,
+   "lane": 3,
+   "midi": 77,
+   "duration": 0.338
+  },
+  {
+   "t": 18.0,
+   "lane": 2,
+   "midi": 76,
+   "duration": 0.675
+  },
+  {
+   "t": 18.75,
+   "lane": 1,
+   "midi": 72,
+   "duration": 0.675
+  },
+  {
+   "t": 19.5,
+   "lane": 2,
+   "midi": 74,
+   "duration": 0.675
+  },
+  {
+   "t": 20.25,
+   "lane": 1,
+   "midi": 72,
+   "duration": 1.35
+  }
+ ]
+}

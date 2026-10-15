@@ -126,6 +126,13 @@ class HandObservation:
     # on this frame. It is the only per-hand score the Tasks API exposes.
     score: float
     landmarks: np.ndarray
+    # (21, 3) float array from ``hand_world_landmarks``: metres, origin near the hand's
+    # geometric centre, same handedness/mirroring as the image. None if not provided.
+    world_landmarks: np.ndarray | None = None
+    # (21,) per-landmark scores, ONLY if the model fills them (``has_visibility`` /
+    # ``has_presence`` in the Tasks API; the hand model may leave them unset). Never invented.
+    visibility: np.ndarray | None = None
+    presence: np.ndarray | None = None
 
     @property
     def wrist(self) -> np.ndarray:
@@ -145,7 +152,8 @@ def observations_from_result(result: Any, mirrored_input: bool) -> list[HandObse
     user's left) came back as "Right" (score 0.95) and the other as "Left".
     """
     observations: list[HandObservation] = []
-    for landmarks, categories in zip(result.hand_landmarks, result.handedness, strict=False):
+    world_all = getattr(result, "hand_world_landmarks", None) or []
+    for i, (landmarks, categories) in enumerate(zip(result.hand_landmarks, result.handedness, strict=False)):
         if len(landmarks) != NUM_LANDMARKS or not categories:
             continue
         best = max(categories, key=lambda c: c.score)
@@ -155,5 +163,22 @@ def observations_from_result(result: Any, mirrored_input: bool) -> list[HandObse
             continue
         handedness = label.opposite if mirrored_input else label
         points = np.array([(p.x, p.y, p.z) for p in landmarks], dtype=np.float32)
-        observations.append(HandObservation(handedness=handedness, score=float(best.score), landmarks=points))
+        world = world_all[i] if i < len(world_all) else None
+        observations.append(HandObservation(
+            handedness=handedness,
+            score=float(best.score),
+            landmarks=points,
+            world_landmarks=None if world is None or len(world) != NUM_LANDMARKS
+            else np.array([(p.x, p.y, p.z) for p in world], dtype=np.float32),
+            visibility=_optional_scores(landmarks, "visibility"),
+            presence=_optional_scores(landmarks, "presence"),
+        ))
     return observations
+
+
+def _optional_scores(landmarks: Any, name: str) -> np.ndarray | None:
+    """Per-landmark scores if the API filled ALL of them (None = not provided by the model)."""
+    values = [getattr(p, name, None) for p in landmarks]
+    if any(v is None for v in values):
+        return None
+    return np.array(values, dtype=np.float32)

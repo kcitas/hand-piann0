@@ -1,0 +1,262 @@
+{
+ "format": "handpiano-chart",
+ "version": 1,
+ "title": "Estrellita, ¿dónde estás?",
+ "artist": "Tradicional",
+ "source": "Melodía de dominio público transcrita a mano para HandPiano",
+ "license": "Dominio público",
+ "notes": [
+  {
+   "t": 3.0,
+   "lane": 0,
+   "midi": 60,
+   "duration": 0.63
+  },
+  {
+   "t": 3.7,
+   "lane": 0,
+   "midi": 60,
+   "duration": 0.63
+  },
+  {
+   "t": 4.4,
+   "lane": 2,
+   "midi": 67,
+   "duration": 0.63
+  },
+  {
+   "t": 5.1,
+   "lane": 2,
+   "midi": 67,
+   "duration": 0.63
+  },
+  {
+   "t": 5.8,
+   "lane": 3,
+   "midi": 69,
+   "duration": 0.63
+  },
+  {
+   "t": 6.5,
+   "lane": 3,
+   "midi": 69,
+   "duration": 0.63
+  },
+  {
+   "t": 7.2,
+   "lane": 2,
+   "midi": 67,
+   "duration": 1.26
+  },
+  {
+   "t": 8.6,
+   "lane": 2,
+   "midi": 65,
+   "duration": 0.63
+  },
+  {
+   "t": 9.3,
+   "lane": 2,
+   "midi": 65,
+   "duration": 0.63
+  },
+  {
+   "t": 10.0,
+   "lane": 1,
+   "midi": 64,
+   "duration": 0.63
+  },
+  {
+   "t": 10.7,
+   "lane": 1,
+   "midi": 64,
+   "duration": 0.63
+  },
+  {
+   "t": 11.4,
+   "lane": 0,
+   "midi": 62,
+   "duration": 0.63
+  },
+  {
+   "t": 12.1,
+   "lane": 0,
+   "midi": 62,
+   "duration": 0.63
+  },
+  {
+   "t": 12.8,
+   "lane": 0,
+   "midi": 60,
+   "duration": 1.26
+  },
+  {
+   "t": 14.2,
+   "lane": 2,
+   "midi": 67,
+   "duration": 0.63
+  },
+  {
+   "t": 14.9,
+   "lane": 2,
+   "midi": 67,
+   "duration": 0.63
+  },
+  {
+   "t": 15.6,
+   "lane": 2,
+   "midi": 65,
+   "duration": 0.63
+  },
+  {
+   "t": 16.3,
+   "lane": 2,
+   "midi": 65,
+   "duration": 0.63
+  },
+  {
+   "t": 17.0,
+   "lane": 1,
+   "midi": 64,
+   "duration": 0.63
+  },
+  {
+   "t": 17.7,
+   "lane": 1,
+   "midi": 64,
+   "duration": 0.63
+  },
+  {
+   "t": 18.4,
+   "lane": 0,
+   "midi": 62,
+   "duration": 1.26
+  },
+  {
+   "t": 19.8,
+   "lane": 2,
+   "midi": 67,
+   "duration": 0.63
+  },
+  {
+   "t": 20.5,
+   "lane": 2,
+   "midi": 67,
+   "duration": 0.63
+  },
+  {
+   "t": 21.2,
+   "lane": 2,
+   "midi": 65,
+   "duration": 0.63
+  },
+  {
+   "t": 21.9,
+   "lane": 2,
+   "midi": 65,
+   "duration": 0.63
+  },
+  {
+   "t": 22.6,
+   "lane": 1,
+   "midi": 64,
+   "duration": 0.63
+  },
+  {
+   "t": 23.3,
+   "lane": 1,
+   "midi": 64,
+   "duration": 0.63
+  },
+  {
+   "t": 24.0,
+   "lane": 0,
+   "midi": 62,
+   "duration": 1.26
+  },
+  {
+   "t": 25.4,
+   "lane": 0,
+   "midi": 60,
+   "duration": 0.63
+  },
+  {
+   "t": 26.1,
+   "lane": 0,
+   "midi": 60,
+   "duration": 0.63
+  },
+  {
+   "t": 26.8,
+   "lane": 2,
+   "midi": 67,
+   "duration": 0.63
+  },
+  {
+   "t": 27.5,
+   "lane": 2,
+   "midi": 67,
+   "duration": 0.63
+  },
+  {
+   "t": 28.2,
+   "lane": 3,
+   "midi": 69,
+   "duration": 0.63
+  },
+  {
+   "t": 28.9,
+   "lane": 3,
+   "midi": 69,
+   "duration": 0.63
+  },
+  {
+   "t": 29.6,
+   "lane": 2,
+   "midi": 67,
+   "duration": 1.26
+  },
+  {
+   "t": 31.0,
+   "lane": 2,
+   "midi": 65,
+   "duration": 0.63
+  },
+  {
+   "t": 31.7,
+   "lane": 2,
+   "midi": 65,
+   "duration": 0.63
+  },
+  {
+   "t": 32.4,
+   "lane": 1,
+   "midi": 64,
+   "duration": 0.63
+  },
+  {
+   "t": 33.1,
+   "lane": 1,
+   "midi": 64,
+   "duration": 0.63
+  },
+  {
+   "t": 33.8,
+   "lane": 0,
+   "midi": 62,
+   "duration": 0.63
+  },
+  {
+   "t": 34.5,
+   "lane": 0,
+   "midi": 62,
+   "duration": 0.63
+  },
+  {
+   "t": 35.2,
+   "lane": 0,
+   "midi": 60,
+   "duration": 1.26
+  }
+ ]
+}

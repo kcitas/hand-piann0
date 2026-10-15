@@ -66,9 +66,10 @@ def test_pipeline_tracks_eight_fingers_from_fake_camera():
         ts = snap.timestamps
         # Internal stages are strictly ordered and kept separate.
         assert ts.frame_capture <= ts.frame_published <= ts.tracking_start <= ts.tracking_end <= ts.finger_state_ready
+        assert ts.finger_state_ready <= ts.mapping_ready <= ts.presses_ready
         assert ts.inference_ms >= 1.0  # the scripted 2 ms sleep is measured
         assert ts.capture_to_result_ms == pytest.approx(
-            ts.conversion_ms + ts.queue_wait_ms + ts.inference_ms + ts.processing_ms
+            ts.conversion_ms + ts.queue_wait_ms + ts.inference_ms + ts.processing_ms + ts.mapping_ms + ts.press_ms
         )
         stats = pipeline.stats()
         assert stats.inference_ms.count >= 5
@@ -220,5 +221,67 @@ def test_spatial_order_depends_on_mirror():
     try:
         assert _wait_for(lambda: pipeline.stats().two_hand_frames >= 5)
         assert pipeline.stats().spatial_order_ok_rate == 0.0
+    finally:
+        pipeline.stop()
+
+
+def test_pipeline_maps_fingers_to_keys_when_a_mapper_is_given():
+    from handpiano.instrument.keyboard import KeyboardLayout
+    from handpiano.mapping.calibration import CameraKey, PianoCalibration
+    from handpiano.mapping.key_mapper import KeyMapper
+
+    layout = KeyboardLayout.from_octaves("C4", 2)
+    cal = PianoCalibration.from_corners([(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)], layout.size,
+                                        CameraKey(0, 640, 480, True))
+    mapper = KeyMapper(layout, cal)
+    camera = CameraManager(CameraSettings(), factory=lambda i, b: FakeCapture(delay_s=0.005))
+    detector = ScriptedDetector([make_hand(Handedness.RIGHT, (0.7, 0.5))])
+    pipeline = TrackingPipeline(camera, lambda: detector, FingerTracker(), key_mapper=mapper)
+    pipeline.start()
+    try:
+        assert _wait_for(lambda: (s := pipeline.latest_snapshot()) is not None and s.mapping is not None)
+        snap = pipeline.latest_snapshot()
+        assert snap.mapping.calibrated
+        assert snap.mapping.inside == 4  # the four right-hand fingers are over the keyboard
+        assert pipeline.stats().mapping_ms.count >= 1
+        mapper.calibration = None  # recalibration in progress: next frames are unmapped, not stale
+        assert _wait_for(lambda: not pipeline.latest_snapshot().mapping.calibrated)
+    finally:
+        pipeline.stop()
+
+
+def test_pipeline_runs_the_press_detector_and_queues_every_event():
+    from handpiano.instrument.keyboard import KeyboardLayout
+    from handpiano.interaction.finger_presses import PressDetector
+    from handpiano.mapping.calibration import CameraKey, PianoCalibration
+    from handpiano.mapping.key_mapper import KeyMapper
+
+    layout = KeyboardLayout.from_octaves("C4", 2)
+    cal = PianoCalibration.from_corners([(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)], layout.size,
+                                        CameraKey(0, 640, 480, True))
+    right = make_hand(Handedness.RIGHT, (0.6, 0.5))
+
+    class Tapper(ScriptedDetector):
+        """Right index taps down and up repeatedly (tip moves 0.03 down in the image)."""
+
+        def detect(self, rgb, timestamp_ms):
+            self.n = getattr(self, "n", 0) + 1
+            pts = right.landmarks.copy()
+            phase = self.n % 30
+            if 10 <= phase < 20:
+                pts[8, 1] += 0.03 * min(1.0, (phase - 9) / 3)
+            return [type(right)(handedness=Handedness.RIGHT, score=0.95, landmarks=pts)]
+
+    camera = CameraManager(CameraSettings(), factory=lambda i, b: FakeCapture(delay_s=0.01))
+    pipeline = TrackingPipeline(camera, lambda: Tapper([]), FingerTracker(), key_mapper=KeyMapper(layout, cal),
+                                press_detector=PressDetector(layout))
+    pipeline.start()
+    try:
+        assert _wait_for(lambda: (s := pipeline.latest_snapshot()) is not None and s.seq >= 70, timeout=6)
+        events = pipeline.drain_events()
+        presses = [e for e in events if e.kind == "press"]
+        assert len(presses) >= 1
+        assert {e.finger.name for e in events} == {"RIGHT_INDEX"}  # only the tapping finger
+        assert pipeline.stats().press_ms.count >= 1
     finally:
         pipeline.stop()

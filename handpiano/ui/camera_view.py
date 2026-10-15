@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import time
 
+import numpy as np
 from PySide6.QtCore import QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QFont, QFontMetricsF, QImage, QPainter, QPen
+from PySide6.QtGui import QColor, QFont, QFontMetricsF, QImage, QPainter, QPen, QPolygonF
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
 from handpiano.app.pipeline import TrackingSnapshot
+from handpiano.instrument.keyboard import KeyboardLayout, PianoKey
+from handpiano.mapping.calibration import PianoCalibration
 from handpiano.metrics.latency import RollingStats
 from handpiano.metrics.performance import CpuAccounting, CpuComponent
 from handpiano.tracking.finger_tracker import HandState, TrackStatus
@@ -23,13 +26,24 @@ WARNING = QColor("#fbbf24")
 HAND_TAG = {Handedness.LEFT: "LEFT", Handedness.RIGHT: "RIGHT"}
 
 
+# The meter's full height is METER_TOP × the press threshold, so the threshold tick sits below the top.
+METER_TOP = 1.4
+
+
+def meter_fraction(depth: float | None, threshold: float) -> float:
+    """How far a finger is towards a press: 0 at rest, 1 at the threshold (clamped to [0, METER_TOP])."""
+    if depth is None or threshold <= 0:
+        return 0.0
+    return max(0.0, min(METER_TOP, depth / threshold))
+
+
 class CameraView(QWidget):
     """Paints the frame that was actually tracked, so landmarks line up with the image.
 
     Measured with real timestamps, once per snapshot (repaints of the same
     snapshot, e.g. on resize, are not counted):
 
-    * ``result_to_ui_ms``: tracker result ready → UI thread picked it up (polling delay).
+    * ``result_to_ui_ms``: full result (fingers + keys) ready → UI thread picked it up (polling delay).
     * ``ui_to_paint_ms``: UI picked it up → paintEvent finished.
     * ``capture_to_paint_ms``: frame delivered by the driver → paintEvent finished.
     * ``paint_ms``: duration of every paintEvent.
@@ -50,8 +64,21 @@ class CameraView(QWidget):
         self._lab_mode = False
         # (title, detail lines, progress 0..1 or None, accent colour) shown on top of the video.
         self._banner: tuple[str, list[str], float | None, QColor] | None = None
+        # Hand placement guide: (text, ok) shown as a bar at the bottom of the video; None = hidden.
+        self._placement: tuple[str, bool] | None = None
+        # Press meter next to each fingertip: the detector's depth against this threshold (None = hidden).
+        self._press_threshold: float | None = None
         self._ui_received_ns: int | None = None
         self._last_painted_seq: int | None = None
+        # Calibrated keyboard projected into the camera image: (key, (4, 2) normalized corners).
+        # Computed once per calibration, not per frame.
+        self._key_polygons: list[tuple[PianoKey, np.ndarray]] = []
+        self._outline: np.ndarray | None = None
+        self._target_midi: int | None = None
+        # Accuracy-test target point, normalized camera coordinates.
+        self._target_point: tuple[float, float] | None = None
+        # Corner capture: (captured points, fingertip in use, dwell progress 0..1).
+        self._calibration: tuple[list[tuple[float, float]], tuple[float, float] | None, float] | None = None
         self.paint_ms = RollingStats()
         self.result_to_ui_ms = RollingStats()
         self.ui_to_paint_ms = RollingStats()
@@ -81,9 +108,37 @@ class CameraView(QWidget):
         self._message = message
         self.update()
 
+    def set_piano_overlay(self, layout: KeyboardLayout, calibration: PianoCalibration | None) -> None:
+        self._key_polygons = []
+        self._outline = None
+        if calibration is not None:
+            for key in (*layout.white_keys, *layout.black_keys):  # blacks last: drawn on top
+                corners = [(key.x, key.y), (key.x + key.width, key.y),
+                           (key.x + key.width, key.y + key.height), (key.x, key.y + key.height)]
+                self._key_polygons.append((key, calibration.to_camera(corners)))
+            self._outline = np.asarray(calibration.camera_points)
+        self.update()
+
+    def set_target(self, midi: int | None) -> None:
+        self._target_midi = midi
+        self.update()
+
+    def set_target_point(self, point: tuple[float, float] | None) -> None:
+        if point != self._target_point:
+            self._target_point = point
+            self.update()
+
+    def set_calibration_overlay(
+        self, points: list[tuple[float, float]] | None, cursor: tuple[float, float] | None = None, progress: float = 0.0
+    ) -> None:
+        overlay = None if points is None else (list(points), cursor, round(progress, 2))
+        if overlay != self._calibration:
+            self._calibration = overlay
+            self.update()
+
     def set_snapshot(self, snapshot: TrackingSnapshot) -> None:
         self._ui_received_ns = time.perf_counter_ns()
-        self.result_to_ui_ms.add((self._ui_received_ns - snapshot.timestamps.finger_state_ready) / 1e6)
+        self.result_to_ui_ms.add((self._ui_received_ns - snapshot.timestamps.mapping_ready) / 1e6)
         self._snapshot = snapshot
         img = snapshot.frame.image
         height, width = img.shape[:2]
@@ -104,7 +159,12 @@ class CameraView(QWidget):
         if self._image is not None and self._snapshot is not None:
             target = self._fit_rect(self._image.width(), self._image.height())
             painter.drawImage(target, self._image)
+            self._draw_piano_overlay(painter, target, self._snapshot)
             self._draw_hands(painter, target, self._snapshot)
+            self._draw_calibration(painter, target)
+            self._draw_target_point(painter, target)
+            if self._placement is not None:
+                self._draw_placement(painter, target, *self._placement)
 
         if self._message:
             self._draw_message(painter, self._message)
@@ -132,6 +192,79 @@ class CameraView(QWidget):
     def _to_widget(target: QRectF, x: float, y: float) -> QPointF:
         return QPointF(target.left() + x * target.width(), target.top() + y * target.height())
 
+    def _polygon(self, target: QRectF, corners: np.ndarray) -> QPolygonF:
+        return QPolygonF([self._to_widget(target, float(x), float(y)) for x, y in corners])
+
+    def _draw_piano_overlay(self, painter: QPainter, target: QRectF, snapshot: TrackingSnapshot) -> None:
+        if not self._key_polygons or self._outline is None:
+            return
+        hover: dict[int, set[Handedness]] = {}
+        if snapshot.mapping is not None and snapshot.mapping.calibrated:
+            # With press data only PRESSED keys are filled; hover alone is not a note.
+            source = (snapshot.presses.pressed_keys if snapshot.presses is not None
+                      else snapshot.mapping.keys_under)
+            for midi, fingers in source.items():
+                hover[midi] = {f.hand for f in fingers}
+        for key, corners in self._key_polygons:
+            polygon = self._polygon(target, corners)
+            hands = hover.get(key.midi)
+            if hands:
+                color = QColor(HAND_COLORS[Handedness.LEFT if Handedness.LEFT in hands else Handedness.RIGHT])
+                if len(hands) == 2:
+                    color = QColor("#ecebf5")
+                color.setAlpha(120)
+                painter.setBrush(color)
+            elif key.is_black:
+                painter.setBrush(QColor(11, 11, 18, 110))
+            else:
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.setPen(QPen(QColor(236, 235, 245, 110), 1))
+            painter.drawPolygon(polygon)
+            if key.midi == self._target_midi:
+                painter.setPen(QPen(WARNING, 3))
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawPolygon(polygon)
+        painter.setPen(QPen(QColor(236, 235, 245, 200), 2))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawPolygon(self._polygon(target, self._outline))
+
+    def _draw_target_point(self, painter: QPainter, target: QRectF) -> None:
+        if self._target_point is None:
+            return
+        c = self._to_widget(target, *self._target_point)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(QPen(BACKGROUND, 6))
+        painter.drawEllipse(c, 14, 14)
+        painter.setPen(QPen(WARNING, 3))
+        painter.drawEllipse(c, 14, 14)
+        painter.drawLine(c + QPointF(-24, 0), c + QPointF(-6, 0))
+        painter.drawLine(c + QPointF(6, 0), c + QPointF(24, 0))
+        painter.drawLine(c + QPointF(0, -24), c + QPointF(0, -6))
+        painter.drawLine(c + QPointF(0, 6), c + QPointF(0, 24))
+
+    def _draw_calibration(self, painter: QPainter, target: QRectF) -> None:
+        if self._calibration is None:
+            return
+        points, cursor, progress = self._calibration
+        widget_points = [self._to_widget(target, x, y) for x, y in points]
+        painter.setPen(QPen(WARNING, 2, Qt.PenStyle.DashLine))
+        for a, b in zip(widget_points, widget_points[1:], strict=False):
+            painter.drawLine(a, b)
+        painter.setFont(QFont("Helvetica", 12, QFont.Weight.Bold))
+        for i, p in enumerate(widget_points, start=1):
+            painter.setPen(QPen(BACKGROUND, 2))
+            painter.setBrush(WARNING)
+            painter.drawEllipse(p, 11, 11)
+            painter.setPen(BACKGROUND)
+            painter.drawText(QRectF(p.x() - 11, p.y() - 11, 22, 22), int(Qt.AlignmentFlag.AlignCenter), f"P{i}")
+        if cursor is not None:
+            c = self._to_widget(target, *cursor)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.setPen(QPen(QColor(251, 191, 36, 90), 4))
+            painter.drawEllipse(c, 22, 22)
+            painter.setPen(QPen(WARNING, 4))
+            painter.drawArc(QRectF(c.x() - 22, c.y() - 22, 44, 44), 90 * 16, int(-360 * 16 * progress))
+
     def _draw_hands(self, painter: QPainter, target: QRectF, snapshot: TrackingSnapshot) -> None:
         if self._lab_mode:
             for hand_state in snapshot.state.hands.values():
@@ -150,6 +283,10 @@ class CameraView(QWidget):
                 painter.setPen(QPen(color, 2))
                 painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawEllipse(center, 7, 7)
+            if snapshot.presses is not None and self._press_threshold and state.status is TrackStatus.TRACKED:
+                fp = snapshot.presses.fingers[finger]
+                pressed = fp.phase.value in ("PRESSED", "RELEASE_CANDIDATE")
+                self._draw_meter(painter, center, meter_fraction(fp.depth, self._press_threshold), pressed, color)
             if self._lab_mode:
                 painter.setPen(TEXT)
                 painter.setFont(QFont("Helvetica", 10))
@@ -237,6 +374,45 @@ class CameraView(QWidget):
             painter.drawRoundedRect(bar, 3, 3)
             painter.setBrush(color)
             painter.drawRoundedRect(QRectF(bar.left(), bar.top(), bar.width() * max(0.0, min(1.0, progress)), 6), 3, 3)
+
+    def set_press_threshold(self, threshold: float | None) -> None:
+        """Show, next to each fingertip, how far the finger is from counting as a press."""
+        self._press_threshold = threshold
+        self.update()
+
+    def _draw_meter(self, painter: QPainter, tip: QPointF, fraction: float, pressed: bool, color: QColor) -> None:
+        height, width = 36.0, 7.0
+        box = QRectF(tip.x() + 11, tip.y() - height / 2, width, height)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(7, 11, 20, 170))
+        painter.drawRoundedRect(box.adjusted(-1.5, -1.5, 1.5, 1.5), 3, 3)
+        fill_h = height * min(fraction, METER_TOP) / METER_TOP
+        fill = QColor("#34d399") if pressed else QColor(color)
+        painter.setBrush(fill)
+        painter.drawRect(QRectF(box.left(), box.bottom() - fill_h, width, fill_h))
+        tick_y = box.bottom() - height / METER_TOP  # the press threshold
+        painter.setPen(QPen(QColor("#ffffff"), 2))
+        painter.drawLine(QPointF(box.left() - 3, tick_y), QPointF(box.right() + 3, tick_y))
+
+    def set_placement(self, text: str | None, ok: bool = False) -> None:
+        placement = None if text is None else (text, ok)
+        if placement != self._placement:
+            self._placement = placement
+            self.update()
+
+    def _draw_placement(self, painter: QPainter, target: QRectF, text: str, ok: bool) -> None:
+        font = QFont("Helvetica", 16, QFont.Weight.Bold)
+        height = QFontMetricsF(font).height() + 16
+        bar = QRectF(target.left() + 12, target.bottom() - height - 12, target.width() - 24, height)
+        color = QColor("#34d399" if ok else "#f59e0b")
+        fill = QColor(color)
+        fill.setAlpha(225)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(fill)
+        painter.drawRoundedRect(bar, 10, 10)
+        painter.setPen(QColor("#070b14"))
+        painter.setFont(font)
+        painter.drawText(bar, int(Qt.AlignmentFlag.AlignCenter), ("✓ " if ok else "⚠ ") + text)
 
     def _draw_message(self, painter: QPainter, message: str) -> None:
         box = QRectF(self.rect()).adjusted(40, 40, -40, -40)

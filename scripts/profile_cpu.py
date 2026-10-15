@@ -30,6 +30,14 @@ import time
 os.environ.setdefault("GLOG_minloglevel", "2")
 
 
+def peak_rss_mb() -> float:
+    """Peak resident memory of this process (ru_maxrss: bytes on macOS, KiB on Linux)."""
+    import resource
+
+    rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return rss / 1e6 if sys.platform == "darwin" else rss / 1e3
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--seconds", type=float, default=30.0)
@@ -137,7 +145,7 @@ def main() -> int:
             print("\nInternal latency (last 300 frames):")
             for name, s in [
                 ("conversion", stats.conversion_ms), ("queue wait", stats.queue_wait_ms),
-                ("inference", stats.inference_ms), ("tracker", stats.processing_ms),
+                ("inference", stats.inference_ms), ("tracker", stats.processing_ms), ("key mapping", stats.mapping_ms),
                 ("capture → result", stats.capture_to_result_ms), ("result → UI", view.result_to_ui_ms.summary()),
                 ("UI → paint", view.ui_to_paint_ms.summary()), ("capture → paint", view.capture_to_paint_ms.summary()),
                 ("paint", view.paint_ms.summary()),
@@ -149,6 +157,8 @@ def main() -> int:
             for comp in (CpuComponent.CAPTURE, CpuComponent.INFERENCE, CpuComponent.TRACKER, CpuComponent.UI):
                 print(f"  {comp:<18} {breakdown.components_pct.get(comp, 0.0):6.1f}")
             print(f"  unattributed       {breakdown.unattributed_pct:6.1f}   (MediaPipe workers, Qt, OS)")
+        print(f"\nPeak memory (max RSS): {peak_rss_mb():.0f} MB")
+        print(f"Piano calibrated: {app.piano.calibrated} ({app.piano.status})")
         if profiler:
             profiler.dump_stats(args.cprofile)
             print(f"\ncProfile written to {args.cprofile}. Top 15 by internal (wall) time:")

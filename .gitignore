@@ -12,3 +12,12 @@ models/*.task
 models/*.part
 
 .DS_Store
+
+# Measurement outputs (e.g. --check-keys-csv precision.csv): personal data, never committed
+/*.csv
+
+# Piano samples, downloaded once with scripts/download_sounds.py (third-party, see docs/AUDIO.md)
+/sounds/
+
+# Trace metadata next to personal recordings (the .csv files are already ignored above)
+/*.meta.json
