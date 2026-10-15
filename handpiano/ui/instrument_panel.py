@@ -38,11 +38,15 @@ class InstrumentCard(QFrame):
         layout.setContentsMargins(12, 8, 12, 8)
         layout.setSpacing(3)
         top = QHBoxLayout()
-        self.name = QLabel(f"{instrument.name.upper()}  ·  {shortcut}")
+        self.name = QLabel(instrument.name)
         self.name.setObjectName("CardName")
         top.addWidget(self.name)
+        key = QLabel(shortcut)
+        key.setObjectName("KeyCap")
+        key.setToolTip(f"Tecla {shortcut}")
+        top.addWidget(key)
         top.addStretch(1)
-        self.chip = QLabel("ACTIVO")
+        self.chip = QLabel("Sonando")
         self.chip.setObjectName("ActiveChip")
         self.chip.setVisible(False)
         top.addWidget(self.chip)
@@ -103,7 +107,7 @@ class InstrumentPanel(QWidget):
             self.cards[instrument_id] = card
             row.addWidget(card, 1)
         volume_box = QVBoxLayout()
-        self.volume_label = QLabel("VOLUMEN 80 %")
+        self.volume_label = QLabel("Volumen 80 %")
         self.volume_label.setObjectName("VolumeLabel")
         volume_box.addWidget(self.volume_label)
         self.volume = QSlider(Qt.Orientation.Horizontal)
@@ -122,7 +126,7 @@ class InstrumentPanel(QWidget):
         row.addLayout(volume_box)
 
     def _on_volume(self, value: int) -> None:
-        self.volume_label.setText(f"VOLUMEN {value} %")
+        self.volume_label.setText(f"Volumen {value} %")
         self.volume_changed.emit(value / 100.0)
 
     def set_volume(self, value: float) -> None:
@@ -130,7 +134,7 @@ class InstrumentPanel(QWidget):
         blocked = self.volume.blockSignals(True)
         self.volume.setValue(round(value * 100))
         self.volume.blockSignals(blocked)
-        self.volume_label.setText(f"VOLUMEN {round(value * 100)} %")
+        self.volume_label.setText(f"Volumen {round(value * 100)} %")
 
     def set_active(self, instrument_id: str) -> None:
         for i, card in self.cards.items():

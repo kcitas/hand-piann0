@@ -33,23 +33,15 @@ from handpiano.instrument.keyboard import KeyboardLayout
 from handpiano.metrics.performance import CpuAccounting
 from handpiano.ui.camera_view import CameraView
 from handpiano.ui.debug_view import DebugView
+from handpiano.ui.finger_keys_view import FingerKeysView
 from handpiano.ui.instrument_panel import InstrumentPanel
 from handpiano.ui.piano_view import PianoView
 from handpiano.ui.rhythm_view import RhythmView
+from handpiano.ui.theme import WINDOW_STYLE
 
 ICON_PATH = Path(__file__).parent / "assets" / "icon.svg"
 
-STYLE = """
-QMainWindow, QWidget { background: #0b0b12; color: #ecebf5; }
-QToolBar { border: none; spacing: 8px; padding: 6px; background: #14141f; }
-QComboBox, QPushButton { background: #1f1f2e; border: 1px solid #2c2c40; border-radius: 6px; padding: 4px 10px; }
-QPushButton:hover { border-color: #8b5cf6; }
-QGroupBox { border: 1px solid #1f1f2e; border-radius: 8px; margin-top: 14px; padding-top: 6px; }
-QGroupBox::title { subcontrol-origin: margin; left: 8px; color: #a78bfa; }
-QTableWidget { background: #0b0b12; gridline-color: #1f1f2e; }
-QHeaderView::section { background: #14141f; color: #a1a1b8; border: none; padding: 4px; }
-QStatusBar { background: #14141f; color: #a1a1b8; }
-"""
+STYLE = WINDOW_STYLE
 
 
 class MainWindow(QMainWindow):
@@ -79,9 +71,13 @@ class MainWindow(QMainWindow):
         self.rhythm_view = RhythmView(self.rhythm_game)
         self.instrument_panel = InstrumentPanel()
         # Mode view (free piano keyboard map or rhythm lanes) on top, camera image below.
+        # Finger-note mode replaces the 2-octave map with one key per finger (set_finger_notes).
+        self.finger_keys_view = FingerKeysView()
+        self._finger_notes = False
         self.mode_stack = QStackedWidget()
         self.mode_stack.addWidget(self.piano_view)
         self.mode_stack.addWidget(self.rhythm_view)
+        self.mode_stack.addWidget(self.finger_keys_view)
         splitter = QSplitter(Qt.Orientation.Vertical)
         self._splitter = splitter
         splitter.addWidget(self.mode_stack)
@@ -123,22 +119,25 @@ class MainWindow(QMainWindow):
         bar.setMovable(False)
         self.addToolBar(bar)
         self.menu_button = QPushButton("☰ Menú")
+        self.menu_button.setObjectName("MenuButton")
         self.menu_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.menu_button.setVisible(False)  # only when opened from the start menu
         self.menu_button.clicked.connect(self.close)
         self._menu_action = bar.addWidget(self.menu_button)
         self._menu_action.setVisible(False)
-        title = QLabel("  HandPiano  ")
-        title.setStyleSheet("font-weight: 700; font-size: 15px;")
+        title = QLabel("HandPiano")
+        title.setObjectName("AppTitle")
         bar.addWidget(title)
 
+        # Camera controls are for diagnosis: shown with the Tracking Lab only.
+        self._camera_actions = []
         self.camera_combo = QComboBox()
         self.set_cameras([self._settings.device_index])
-        bar.addWidget(self.camera_combo)
+        self._camera_actions.append(bar.addWidget(self.camera_combo))
 
         probe = QPushButton("Buscar cámaras")
         probe.clicked.connect(self.probe_requested.emit)
-        bar.addWidget(probe)
+        self._camera_actions.append(bar.addWidget(probe))
 
         self.resolution_combo = QComboBox()
         for w, h in RESOLUTION_PRESETS:
@@ -149,44 +148,48 @@ class MainWindow(QMainWindow):
                 f"{self._settings.width}×{self._settings.height}", f"{self._settings.width}x{self._settings.height}"
             )
         self._select_data(self.resolution_combo, f"{self._settings.width}x{self._settings.height}")
-        bar.addWidget(self.resolution_combo)
+        self._camera_actions.append(bar.addWidget(self.resolution_combo))
 
         self.fps_combo = QComboBox()
         for fps in FPS_PRESETS:
             self.fps_combo.addItem(f"{fps} fps solicitados", fps)
         self._select_data(self.fps_combo, self._settings.fps)
-        bar.addWidget(self.fps_combo)
+        self._camera_actions.append(bar.addWidget(self.fps_combo))
 
         apply = QPushButton("Aplicar")
         apply.clicked.connect(self._on_apply)
-        bar.addWidget(apply)
+        self._camera_actions.append(bar.addWidget(apply))
+        self._camera_actions.append(bar.addSeparator())
+        for action in self._camera_actions:
+            action.setVisible(False)
 
-        bar.addSeparator()
         self.mode_buttons: dict[str, QPushButton] = {}
         group = QButtonGroup(self)
         group.setExclusive(True)
-        for mode, text in (("piano", "Piano Libre"), ("rhythm", "Juego Rítmico 4K")):
+        for mode, text in (("piano", "Piano libre"), ("rhythm", "Juego rítmico")):
             button = QPushButton(text)
             button.setCheckable(True)
             button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-            button.setStyleSheet("QPushButton:checked { border: 2px solid #22d3ee; color: #22d3ee; }")
+            button.setObjectName("ModeButton")
             button.clicked.connect(lambda _=False, m=mode: self.set_mode(m))
             group.addButton(button)
             bar.addWidget(button)
             self.mode_buttons[mode] = button
         self.mode_buttons["piano"].setChecked(True)
 
-        bar.addSeparator()
+        # Calibration only means something for the drawn keyboard (hidden in finger-note mode).
+        self._calibration_actions = [bar.addSeparator()]
         self.calibrate_button = QPushButton("Calibrar piano")
         self.calibrate_button.clicked.connect(self.calibrate_requested.emit)
-        bar.addWidget(self.calibrate_button)
+        self._calibration_actions.append(bar.addWidget(self.calibrate_button))
         self.forget_button = QPushButton("Olvidar calibración")
         self.forget_button.clicked.connect(self.forget_calibration_requested.emit)
-        bar.addWidget(self.forget_button)
+        self._calibration_actions.append(bar.addWidget(self.forget_button))
         for button in (probe, apply, self.calibrate_button, self.forget_button):
             button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         spacer = QWidget()
+        spacer.setStyleSheet("background: transparent;")
         spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         bar.addWidget(spacer)
 
@@ -215,14 +218,27 @@ class MainWindow(QMainWindow):
         super().closeEvent(event)
         self.closed.emit()
 
+    def set_finger_notes(self, enabled: bool) -> None:
+        """Finger-note mode: one key per finger instead of the 2-octave map, and a larger video
+        (the player has to see the hands)."""
+        self._finger_notes = enabled
+        for action in self._calibration_actions:
+            action.setVisible(not enabled)
+        self.set_mode(self.mode)
+
     def set_mode(self, mode: str) -> None:
         if mode not in self.mode_buttons:
             raise ValueError(mode)
         self.mode_buttons[mode].setChecked(True)
-        self.mode_stack.setCurrentWidget(self.piano_view if mode == "piano" else self.rhythm_view)
+        keys = self.finger_keys_view if self._finger_notes else self.piano_view
+        self.mode_stack.setCurrentWidget(keys if mode == "piano" else self.rhythm_view)
+        # A stacked widget is as tall as its tallest page; the finger keys need far less than the lanes.
+        compact = self._finger_notes and mode == "piano"
+        self.mode_stack.setMaximumHeight(self.finger_keys_view.maximumHeight() if compact else 16777215)
         # The lanes need height to read the falling notes; the keyboard map does not.
-        total = max(1, sum(self._splitter.sizes()))
-        top = 0.6 if mode == "rhythm" else 0.2
+        # Before the window is shown the splitter has no size yet: use the window's height.
+        total = max(sum(self._splitter.sizes()), self.height() - 200, 1)
+        top = 0.6 if mode == "rhythm" else 0.18 if self._finger_notes else 0.2
         self._splitter.setSizes([int(total * top), total - int(total * top)])
         if mode != self.mode:
             self.mode = mode
@@ -232,6 +248,8 @@ class MainWindow(QMainWindow):
         if self.lab_checkbox.isChecked() != enabled:
             self.lab_checkbox.setChecked(enabled)
         self._dock.setVisible(enabled)
+        for action in self._camera_actions:
+            action.setVisible(enabled)
         self.camera_view.set_lab_mode(enabled)
         self.piano_view.set_lab_mode(enabled)
 

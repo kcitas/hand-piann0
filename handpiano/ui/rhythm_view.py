@@ -27,16 +27,18 @@ from handpiano.instrument.note import midi_to_note_name
 from handpiano.ui.holo import GREEN, LANE_COLORS, RED, TEXT, TEXT_DIM, glow, paint_grid
 
 LANE_KEYS = ("D", "F", "J", "K")
+from handpiano.ui.theme import FONT, INK, IVORY, LINE, MUTED, SPOTLIGHT, STAGE, qcolor  # noqa: E402
+
 LOOKAHEAD_S = 1.6
 HIT_LINE = 0.84  # fraction of the canvas height
 GRADE_COLORS = {"PERFECT": QColor("#22d3ee"), "GREAT": QColor("#a78bfa"), "GOOD": GREEN, "MISS": RED}
 
-BUTTON_STYLE = """
-QPushButton { background: rgba(18, 30, 52, 200); color: #e6f1ff; border: 1px solid #1d3354;
-              border-radius: 10px; padding: 5px 12px; }
-QPushButton:hover { border-color: #a78bfa; }
-QPushButton:checked { border: 2px solid #22d3ee; color: #22d3ee; }
-QPushButton:disabled { color: #4a5a78; }
+BUTTON_STYLE = f"""
+QPushButton {{ background: {STAGE}; color: {IVORY}; border: 1px solid {LINE}; font-family: "{FONT}";
+              border-radius: 10px; padding: 5px 12px; }}
+QPushButton:hover {{ border-color: {MUTED}; }}
+QPushButton:checked {{ background: {SPOTLIGHT}; color: {INK}; border-color: {SPOTLIGHT}; font-weight: 600; }}
+QPushButton:disabled {{ color: {LINE}; }}
 """
 
 
@@ -50,6 +52,8 @@ class RhythmCanvas(QWidget):
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._flash: dict[int, float] = {}
         self.notice = "Elige una canción o el ejercicio y pulsa ▶ Empezar"
+        # Text under each lane: the computer key, or the finger in finger-note mode (set_lane_labels).
+        self.lane_labels: tuple[str, ...] = LANE_KEYS
         self.clock = time.perf_counter
         self._judged_at = -10.0
 
@@ -94,7 +98,7 @@ class RhythmCanvas(QWidget):
             p.drawLine(QPointF(r.left() + 6, hit_y), QPointF(r.right() - 6, hit_y))
             p.setPen(TEXT_DIM)
             p.setFont(QFont("Helvetica", 12, QFont.Weight.Bold))
-            p.drawText(QRectF(r.left(), hit_y + 8, r.width(), 24), int(Qt.AlignmentFlag.AlignCenter), LANE_KEYS[lane])
+            p.drawText(QRectF(r.left(), hit_y + 8, r.width(), 24), int(Qt.AlignmentFlag.AlignCenter), self.lane_labels[lane])
         game = self.game
         if game.running:
             t = game.song_time(now)
@@ -125,7 +129,10 @@ class RhythmCanvas(QWidget):
             p.setPen(TEXT)
             p.setFont(QFont("Helvetica", 15, QFont.Weight.Bold))
             box = QRectF(self.rect()).adjusted(20, 0, -20, 0)
-            p.fillRect(QRectF(box.left(), box.center().y() - 20, box.width(), 40), QColor(7, 11, 20, 210))
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(qcolor(STAGE, 235))
+            p.drawRoundedRect(QRectF(box.left(), box.center().y() - 22, box.width(), 44), 22, 22)
+            p.setPen(qcolor(IVORY))
             p.drawText(box, int(Qt.AlignmentFlag.AlignCenter), self.notice)
         p.end()
 
@@ -139,9 +146,9 @@ class RhythmCanvas(QWidget):
         game = self.game
         acc = game.accuracy
         lines = [
-            ("PUNTOS", f"{game.score:,}".replace(",", " ")),
-            ("COMBO", f"{game.combo}  (máx {game.max_combo})"),
-            ("PRECISIÓN", "—" if acc is None else f"{acc * 100:.1f} %"),
+            ("Puntos", f"{game.score:,}".replace(",", " ")),
+            ("Combo", f"{game.combo}  (máx {game.max_combo})"),
+            ("Precisión", "—" if acc is None else f"{acc * 100:.1f} %"),
         ]
         p.setFont(QFont("Helvetica", 10, QFont.Weight.Bold))
         y = 18.0
@@ -168,13 +175,13 @@ class RhythmView(QWidget):
 
     def __init__(self, game: RhythmGame, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setStyleSheet("background: #070b14;")
+        self.setStyleSheet(f"background: {INK};")
         self.game = game
         self.canvas = RhythmCanvas(game)
         bar = QHBoxLayout()
         bar.setContentsMargins(8, 6, 8, 6)
-        title = QLabel("JUEGO RÍTMICO 4K")
-        title.setStyleSheet("color: #22d3ee; font-weight: 900; letter-spacing: 2px;")
+        title = QLabel("Juego rítmico")
+        title.setStyleSheet(f"color: {IVORY}; font-family: '{FONT}'; font-size: 16px; font-weight: 700; padding-right: 8px;")
         bar.addWidget(title)
         self.slot_buttons: list[QPushButton] = []
         for i in range(4):

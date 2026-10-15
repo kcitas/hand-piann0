@@ -46,7 +46,7 @@ def key(kind, text):
 def test_panel_shows_three_cards_and_the_active_one(qapp):
     panel = InstrumentPanel()
     assert [c.instrument_id for c in panel.cards.values()] == ["grand", "upright", "electric"]
-    assert "GRAND PIANO" in panel.cards["grand"].name.text() and panel.cards["electric"].desc.text()
+    assert "Grand Piano" in panel.cards["grand"].name.text() and panel.cards["electric"].desc.text()
     selected = []
     panel.instrument_selected.connect(selected.append)
     panel.cards["upright"].clicked.emit("upright")
@@ -57,7 +57,7 @@ def test_panel_shows_three_cards_and_the_active_one(qapp):
     volumes = []
     panel.volume_changed.connect(volumes.append)
     panel.volume.setValue(30)
-    assert volumes == [0.3] and panel.volume_label.text() == "VOLUMEN 30 %"
+    assert volumes == [0.3] and panel.volume_label.text() == "Volumen 30 %"
 
 
 def test_controller_follows_the_engine_and_plays_a_test_note(qapp, sounds):

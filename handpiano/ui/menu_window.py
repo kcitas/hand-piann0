@@ -5,6 +5,8 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QGridLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
+from handpiano.ui.theme import FONT, INK, IVORY, LINE, MUTED, SPOTLIGHT, STAGE
+
 # (id, title, how to play) in menu order. The ids are what ``chosen`` emits.
 MODES: tuple[tuple[str, str, str], ...] = (
     ("libre", "🎹  Piano Libre",
@@ -20,20 +22,18 @@ MODES: tuple[tuple[str, str, str], ...] = (
      "Sin cámara: los tres pianos con el teclado del ordenador y el ratón."),
 )
 
-STYLE = """
-QWidget#Menu { background: #070b14; }
-QLabel#Title { color: #e6f1ff; font-size: 40px; font-weight: 800; letter-spacing: 2px; }
-QLabel#Subtitle { color: #7a8bab; font-size: 15px; }
-QPushButton#ModeCard {
-    background: rgba(18, 30, 52, 220); border: 1px solid #1d3354; border-radius: 16px;
-    color: #e6f1ff; text-align: left; padding: 22px 26px; font-size: 14px;
-}
-QPushButton#ModeCard:hover { border: 2px solid #22d3ee; background: rgba(16, 46, 66, 235); }
-QLabel#CardTitle { color: #e6f1ff; font-size: 22px; font-weight: 800; background: transparent; }
-QLabel#CardHow { color: #9fb2d4; font-size: 14px; background: transparent; }
-QPushButton#Quit { background: transparent; color: #7a8bab; border: 1px solid #1d3354; border-radius: 10px;
-                   padding: 8px 22px; font-size: 13px; }
-QPushButton#Quit:hover { color: #f87171; border-color: #f87171; }
+STYLE = f"""
+QWidget#Menu {{ background: {INK}; font-family: "{FONT}"; }}
+QLabel#Title {{ color: {IVORY}; font-size: 44px; font-weight: 700; background: transparent; }}
+QLabel#Subtitle {{ color: {MUTED}; font-size: 16px; background: transparent; }}
+QPushButton#ModeCard {{ background: {STAGE}; border: 1px solid {LINE}; border-radius: 18px; text-align: left; }}
+QPushButton#ModeCard:hover {{ border: 2px solid {SPOTLIGHT}; }}
+QPushButton#ModeCard:focus {{ border: 2px solid {SPOTLIGHT}; }}
+QLabel#CardTitle {{ color: {IVORY}; font-size: 23px; font-weight: 700; background: transparent; }}
+QLabel#CardHow {{ color: {MUTED}; font-size: 14px; background: transparent; }}
+QPushButton#Quit {{ background: transparent; color: {MUTED}; border: 1px solid {LINE}; border-radius: 12px;
+                   padding: 8px 26px; font-size: 14px; }}
+QPushButton#Quit:hover {{ color: {IVORY}; border-color: {MUTED}; }}
 """
 
 
@@ -53,7 +53,7 @@ class MenuWindow(QWidget):
         title = QLabel("HandPiano")
         title.setObjectName("Title")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        subtitle = QLabel("Un piano que se toca con las manos delante de la cámara · elige cómo quieres tocar")
+        subtitle = QLabel("Toca el piano con las manos delante de la cámara. Elige cómo quieres tocar.")
         subtitle.setObjectName("Subtitle")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)

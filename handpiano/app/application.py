@@ -134,6 +134,8 @@ class Application(QObject):
         if config.presses.finger_notes:
             window.camera_view.set_finger_labels({f: SOLFEGE[m % 12] for f, m in FINGER_NOTES.items()})
             window.camera_view.set_piano_visible(False)
+            window.set_finger_notes(True)
+            window.rhythm_view.canvas.lane_labels = ("medio izq.", "índice izq.", "índice der.", "medio der.")
         if mic is not None:
             self.audio.note_listeners.append(mic.note_played)  # ignore our own piano for a moment
             window.piano_view.pressed_source = lambda: self._fusion_held
@@ -148,6 +150,8 @@ class Application(QObject):
         window.rhythm_view.canvas.lane_pressed.connect(lambda lane: self._lane_press(lane, time.perf_counter()))
         window.piano_view.key_pressed.connect(lambda midi: self.audio.note_on(midi, HIT_VELOCITY))
         window.piano_view.key_released.connect(self.audio.note_off)
+        window.finger_keys_view.key_pressed.connect(lambda midi: self.audio.note_on(midi, HIT_VELOCITY))
+        window.finger_keys_view.key_released.connect(self.audio.note_off)
         window.mode_changed.connect(self._on_mode)
         app = QCoreApplication.instance()
         if app is not None:
@@ -584,6 +588,8 @@ class Application(QObject):
             if self.handedness_check is not None:
                 self.handedness_check.update(time.monotonic(), snapshot.state)
         self.piano.update(time.monotonic(), snapshot, new_snapshot)
+        if snapshot is not None and new_snapshot and self.config.presses.finger_notes:
+            self.window.finger_keys_view.set_presses(snapshot.presses)
         self._update_trace(pipeline)
         if not self.piano.busy:
             self._update_handedness_check(pipeline)

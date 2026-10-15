@@ -15,6 +15,7 @@ from handpiano.app.audio_controller import AudioController, NoteKeys
 from handpiano.audio.engine import AudioEngine
 from handpiano.instrument.note import midi_to_note_name
 from handpiano.ui.holo import STYLE
+from handpiano.ui.theme import FONT, INK, MUTED
 from handpiano.ui.instrument_panel import InstrumentPanel
 from handpiano.ui.note_pads import NotePads
 
@@ -29,7 +30,7 @@ class AudioTestWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("HandPiano · prueba de sonido")
         self.resize(1100, 520)
-        self.setStyleSheet("QMainWindow { background: #070b14; } " + STYLE)
+        self.setStyleSheet(f"QMainWindow {{ background: {INK}; }} " + STYLE)
         self.engine = engine
         self.keys = NoteKeys()
         self.panel = InstrumentPanel()
@@ -38,7 +39,7 @@ class AudioTestWindow(QMainWindow):
         self.pads.note_pressed.connect(self._on)
         self.pads.note_released.connect(self._off)
         self.info = QLabel(HELP)
-        self.info.setStyleSheet("color: #9fb2d4; padding: 6px 12px;")
+        self.info.setStyleSheet(f"color: {MUTED}; padding: 6px 12px; font-family: '{FONT}';")
         self.info.setWordWrap(True)
         central = QWidget()
         layout = QVBoxLayout(central)

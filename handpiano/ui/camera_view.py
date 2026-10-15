@@ -18,7 +18,7 @@ from handpiano.tracking.finger_tracker import HandState, TrackStatus
 from handpiano.tracking.landmarks import HAND_CONNECTIONS, PLAYING_FINGERS, Finger, Handedness, Landmark
 
 HAND_COLORS = {Handedness.LEFT: QColor("#22d3ee"), Handedness.RIGHT: QColor("#a78bfa")}
-BACKGROUND = QColor("#0b0b12")
+BACKGROUND = QColor("#0F1426")  # theme.INK
 TEXT = QColor("#ecebf5")
 MUTED = QColor("#a1a1b8")
 WARNING = QColor("#fbbf24")
@@ -425,6 +425,9 @@ class CameraView(QWidget):
     def _draw_placement(self, painter: QPainter, target: QRectF, text: str, ok: bool) -> None:
         label = ("✓ " if ok else "⚠ ") + text
         width = target.width() - 24
+        # A pill sized to its text when it fits; it never covers more than the video's width.
+        natural = QFontMetricsF(QFont("Helvetica", 16, QFont.Weight.Bold)).horizontalAdvance(label) + 56
+        width = min(width, natural)
         size = 16
         font = QFont("Helvetica", size, QFont.Weight.Bold)
         while size > 10 and QFontMetricsF(font).horizontalAdvance(label) > width - 24:  # always fits the video
@@ -432,13 +435,13 @@ class CameraView(QWidget):
             font = QFont("Helvetica", size, QFont.Weight.Bold)
         label = QFontMetricsF(font).elidedText(label, Qt.TextElideMode.ElideRight, width - 24)
         height = QFontMetricsF(font).height() + 16
-        bar = QRectF(target.left() + 12, target.bottom() - height - 12, width, height)
+        bar = QRectF(target.center().x() - width / 2, target.bottom() - height - 14, width, height)
         color = QColor("#34d399" if ok else "#f59e0b")
         fill = QColor(color)
         fill.setAlpha(225)
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(fill)
-        painter.drawRoundedRect(bar, 10, 10)
+        painter.drawRoundedRect(bar, height / 2, height / 2)
         painter.setPen(QColor("#070b14"))
         painter.setFont(font)
         painter.drawText(bar, int(Qt.AlignmentFlag.AlignCenter), label)

@@ -12,6 +12,12 @@ HandPiano sigue tus manos con la webcam y convierte sus movimientos en notas de 
 
 ![Menú de inicio de HandPiano](docs/img/menu.png)
 
+| Piano Libre | Juego rítmico |
+| --- | --- |
+| ![Piano Libre: una tecla por dedo, la que suena se ilumina](docs/img/piano_libre.png) | ![Juego rítmico con un carril por dedo](docs/img/juego.png) |
+
+*Capturas generadas sin cámara, con manos sintéticas.*
+
 ---
 
 ## Índice
@@ -118,7 +124,7 @@ Mano izquierda:  meñique Do  ·  anular Re  ·  medio Mi  ·  índice Fa
 Mano derecha:    índice Sol  ·  medio La  ·  anular Si  ·  meñique Do (agudo)
 ```
 
-La escala de Do mayor va de izquierda a derecha, como en un piano. El nombre de cada nota aparece encima de su dedo en el vídeo, y el teclado de arriba ilumina la tecla que suena. En este modo no se dibuja ningún piano sobre el vídeo, porque no hace falta.
+La escala de Do mayor va de izquierda a derecha, como en un piano. El nombre de cada nota aparece encima de su dedo en el vídeo, y el teclado de arriba ilumina la tecla que suena. En este modo no se dibuja ningún piano sobre el vídeo: arriba hay **8 teclas grandes, una por dedo**, que se iluminan en ámbar mientras suenan (también se pueden pulsar con el ratón), y el vídeo de las manos ocupa el resto de la ventana.
 
 ### 🎮 Juego Rítmico
 
@@ -130,6 +136,7 @@ Las notas caen por 4 carriles; hay que tocarlas cuando llegan a la línea.
   - carril 3: índice derecho;
   - carril 4: medio derecho (o anular y meñique derechos).
 - **Con el teclado:** D F J K.
+- Debajo de cada carril se indica el dedo que lo toca.
 - **Juicio por tiempo:** PERFECT ±50 ms, GREAT ±100 ms, GOOD ±160 ms; fuera de eso, MISS. Al acertar suena la nota de la melodía.
 - **Canciones incluidas** (en `songs/`, dominio público, transcritas para el juego y lentas para poder tocarlas con las manos):
 
