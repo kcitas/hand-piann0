@@ -115,11 +115,14 @@ class PressConfig:
         (notas_4, posture right 92–96 % of the time): 33/40. refractory_s 0.25 (same finger, ≥ 0.25 s
         between notes) removes 2–4 double triggers in both recordings without losing hits; the fastest
         repeated note in the bundled songs is 0.375 s. No minimum speed (min_velocity 0): a slow bend
-        plays too, like the reference air-piano; on both recordings it costs nothing (33→34 and 33→33,
-        same extra presses). One player, one camera.
+        plays too; on both recordings it costs nothing (33→34 and 33→33, same extra presses). Common
+        mode "idle_min" (only the fingers at rest are subtracted, so bending two neighbours together is
+        not cancelled as a hand movement): in free play (libre_1) "hand_low" cancelled such bends and
+        played 22 notes, "idle_min" plays 33; guided 34/40 and 35/40 (was 34 and 33), with more extra
+        presses (29 and 27, was 16 and 25). One player, one camera.
         """
         values: dict[str, object] = {"feature": "flex", "press_on": 0.35, "release_off": 0.175, "refractory_s": 0.25,
-                                     "min_velocity": 0.0,
+                                     "min_velocity": 0.0, "common_mode": "idle_min",
                                      "finger_notes": True}
         values.update(overrides)
         return cls(**values)  # type: ignore[arg-type]

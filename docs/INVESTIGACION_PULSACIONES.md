@@ -188,6 +188,8 @@ Ninguna combinación de `press_on` ∈ {0,08; 0,10; 0,12}, `min_velocity` ∈ {0
 
 En `notas_3`, `press_on` de 0,30 a 0,40 da 32–33/40: un tramo estable. Se adopta 0,35 (suelta en 0,175), y `notas_4`, independiente, lo confirma con 33/40. Origen de las 27 de más en `notas_4`: 11 lejos de cualquier aviso (al colocarse), 8 dobles disparos del mismo dedo, 5 de un vecino sin el dedo pedido y 3 de un vecino junto a él. Un refractario de 0,25 s quita 2–4 en ambas grabaciones sin perder aciertos (32→33 y 33→33): adoptado. Por dedo: índices 5/5, mano derecha 5/5 en todos; medio izquierdo 2/5, anular izquierdo 1/5. Doblar un dedo es un gesto que la webcam frontal sí ve, al contrario que el toque en la mesa.
 
+**Tocando libre (`libre_1`, 35 s).** Con `hand_low` sonaban 22 notas. Varios dobleces de dos dedos vecinos a la vez (medio y anular) los anulaba la resta del modo común, que los tomaba por un movimiento de toda la mano. Con `common_mode="idle_min"` (solo se restan los dedos quietos): libre 33 notas; guiadas 34/40 (+29) y 35/40 (+27), frente a 34 (+16) y 33 (+25) con `hand_low`. Adoptado `idle_min` en "dedo = nota" (el piano dibujado sigue con `hand_low`).
+
 **Siguientes pasos con más potencial que ajustar umbrales:**
 1. una cámara a la altura de la mesa, mirando los dedos de lado (un móvil como webcam);
 2. un gesto más visible que el toque, como doblar el dedo (ángulo de la articulación PIP);
