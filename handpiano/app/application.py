@@ -19,7 +19,7 @@ from handpiano.app.handedness_check import HandednessCheck
 from handpiano.app.piano_controller import PianoController
 from handpiano.app.pipeline import PipelineState, TrackingPipeline, TrackingSnapshot
 from handpiano.app.placement import PlacementConfig, PlacementGuide, keyboard_box
-from handpiano.app.press_sound import PressSound, describe, outcomes_by_tag, summary
+from handpiano.app.press_sound import FINGER_NOTE_VELOCITY_FLOOR, PressSound, describe, outcomes_by_tag, summary
 from handpiano.audio.engine import AudioEngine
 from handpiano.audio.tap_input import MicTapInput
 from handpiano.camera.camera_config import CameraSettings
@@ -122,6 +122,8 @@ class Application(QObject):
         self.audio = audio if audio is not None else AudioEngine()
         self.audio_controller = AudioController(self.audio, window.instrument_panel, self)
         self.press_sound = PressSound(self.audio)
+        if config.presses.finger_notes:
+            self.press_sound.velocity_floor = FINGER_NOTE_VELOCITY_FLOOR
         # Microphone mode (--microfono): the microphone says WHEN a finger hit the table and the camera
         # says WHICH finger; the camera-only detector keeps running but its events are not played.
         self.mic = mic

@@ -46,10 +46,16 @@ class NoteSink(Protocol):
     def note_off(self, midi: int, tag: int | None = None) -> bool: ...
 
 
-def velocity_from_press(speed: float | None) -> int:
+def velocity_from_press(speed: float | None, floor: int = 40) -> int:
     if speed is None or math.isnan(speed):
-        return 90
-    return int(max(40, min(120, round(50 + 18 * max(-10.0, min(10.0, speed))))))
+        return max(90, floor)
+    return int(max(floor, min(120, round(50 + 18 * max(-10.0, min(10.0, speed))))))
+
+
+# Finger-note mode: a slow bend is not a soft note. With the speed mapping, ~1 in 5 bends got
+# velocity 40–50, 17 dB below a fast one on the grand piano: lit but inaudible on laptop speakers.
+# 85 is about 5 dB below the loudest.
+FINGER_NOTE_VELOCITY_FLOOR = 85
 
 
 @dataclass
@@ -70,6 +76,7 @@ class PressSound:
     def __init__(self, sink: NoteSink) -> None:
         self.sink = sink
         self.enabled = True
+        self.velocity_floor = 40  # quietest note a press can play (FINGER_NOTE_VELOCITY_FLOOR in finger-note mode)
         self._held: dict[Any, tuple[int, int]] = {}  # finger → (midi, record id)
         self._lock = threading.Lock()  # on_frame (tracking thread) vs set_enabled / stop_all (UI thread)
         self._ids = itertools.count(1)
@@ -120,7 +127,7 @@ class PressSound:
                     midi = e.key.midi
                     restrike = any(m == midi for m, _ in self._held.values())
                     record = NoteRecord(next(self._ids), e.t, getattr(e.finger, "name", str(e.finger)), midi,
-                                        velocity_from_press(e.velocity), restrike)
+                                        velocity_from_press(e.velocity, self.velocity_floor), restrike)
                     self._record(record)
                     self._held[e.finger] = (midi, record.id)
                     record.note_on = self._call(self.sink.note_on, midi, record.velocity, tag=record.id)

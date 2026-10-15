@@ -41,6 +41,9 @@ log = logging.getLogger(__name__)
 DEFAULT_SOUNDS_DIR = Path(__file__).resolve().parents[2] / "sounds"
 SAMPLE_RATE = 44100
 BLOCK_FRAMES = 256  # 5.8 ms at 44.1 kHz
+# Laptop speakers distort near full scale. At 0.8 a single loud note peaked at 0.40–0.55 and a 4-note
+# chord at 0.68–0.92 of full scale (8 notes: up to 0.98); at 0.5 the chord stays at about 0.4–0.6.
+DEFAULT_VOLUME = 0.5
 
 
 class AudioOutput(Protocol):
@@ -141,7 +144,7 @@ class EngineStatus:
 
 class AudioEngine:
     def __init__(self, sounds_dir: Path = DEFAULT_SOUNDS_DIR, output: AudioOutput | None = None,
-                 sample_rate: int = SAMPLE_RATE, volume: float = 0.8, max_voices: int = 48) -> None:
+                 sample_rate: int = SAMPLE_RATE, volume: float = DEFAULT_VOLUME, max_voices: int = 48) -> None:
         self.sounds_dir = sounds_dir
         self.output: AudioOutput = output if output is not None else NullOutput()
         self.mixer = Mixer(sample_rate=sample_rate, max_voices=max_voices, volume=volume)

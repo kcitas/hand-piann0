@@ -231,3 +231,12 @@ def test_no_bank_is_reported_not_claimed_as_played(tmp_path):
     assert record.note_on == "encolada"  # accepted by the queue…
     assert outcomes[(record.id, "on")].result == "sin banco: nota descartada"  # …but nothing was played
     assert summary(sound.records, outcomes)["voz iniciada"] == 0
+
+
+def test_finger_note_mode_never_plays_inaudibly_soft_notes():
+    from handpiano.app.press_sound import FINGER_NOTE_VELOCITY_FLOOR, velocity_from_press
+
+    assert velocity_from_press(0.0) == 50  # drawn piano: a slow press is a soft note
+    assert velocity_from_press(0.0, FINGER_NOTE_VELOCITY_FLOOR) == 85  # finger notes: never below 85
+    assert velocity_from_press(9.0, FINGER_NOTE_VELOCITY_FLOOR) == 120
+    assert velocity_from_press(None, FINGER_NOTE_VELOCITY_FLOOR) == 90

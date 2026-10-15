@@ -76,8 +76,11 @@ def test_controller_follows_the_engine_and_plays_a_test_note(qapp, sounds):
         qapp.processEvents()
         time.sleep(0.01)
     assert commands(engine)[0] == ("on", TEST_NOTE, 96) and engine.status().instrument == "grand"
-    controller.change_volume(-0.5)
-    assert engine.volume == pytest.approx(0.3) and panel.volume.value() == 30
+    from handpiano.audio.engine import DEFAULT_VOLUME
+
+    controller.change_volume(-0.2)
+    expected = round(DEFAULT_VOLUME - 0.2, 2)
+    assert engine.volume == pytest.approx(expected) and panel.volume.value() == round(expected * 100)
     assert controller.handle_shortcut("3") and engine.status().instrument == "electric"
 
 
@@ -173,8 +176,10 @@ def test_keyboard_alternatives_in_the_app(qapp, sounds):
     assert app._rhythm_keys_down == {"D"}
     app.eventFilter(window, key(QEvent.Type.KeyRelease, "d"))
     assert commands(engine) == []  # pressing a lane with no note due plays nothing
+    from handpiano.audio.engine import DEFAULT_VOLUME
+
     app.eventFilter(window, key(QEvent.Type.KeyPress, "+"))
-    assert engine.volume == pytest.approx(0.9)
+    assert engine.volume == pytest.approx(DEFAULT_VOLUME + 0.1)
     app.shutdown()
     window.close()
 

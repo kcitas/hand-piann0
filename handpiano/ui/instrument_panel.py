@@ -107,7 +107,7 @@ class InstrumentPanel(QWidget):
             self.cards[instrument_id] = card
             row.addWidget(card, 1)
         volume_box = QVBoxLayout()
-        self.volume_label = QLabel("Volumen 80 %")
+        self.volume_label = QLabel("Volumen 50 %")
         self.volume_label.setObjectName("VolumeLabel")
         volume_box.addWidget(self.volume_label)
         self.volume = QSlider(Qt.Orientation.Horizontal)
