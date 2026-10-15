@@ -176,6 +176,16 @@ Ninguna combinación de `press_on` ∈ {0,08; 0,10; 0,12}, `min_velocity` ∈ {0
 
 **Defecto observado:** dedos que se quedan en PRESSED decenas de segundos cuando la postura cambia durante una pulsación (la línea base está congelada en PRESSED). Limitarlo con `max_press_s` = 1,5 s sube 14 → 18 aciertos de 200, con 5 pulsaciones de más. Es una ganancia pequeña y no está activado.
 
+**Modo "dedo = nota" (15 de octubre).** Manos levantadas, palma hacia la cámara; una nota = doblar el dedo. Señal `flex` (longitud aparente del dedo). Misma prueba `dedos`:
+
+| Grabación | Postura | Umbral 0,50 | Umbral 0,35 |
+| --- | --- | --- | --- |
+| `notas_1` | correcta 33–42 % del tiempo | 0/40 (+1) | 3/40 (+4) |
+| `notas_2` | manos no vistas 91–92 % | 0/40 | 0/40 |
+| `notas_3` | manos vistas, barra de postura | 18/40 (+8) | **32/40 (+18)** |
+
+En `notas_3`, `press_on` de 0,30 a 0,40 da 32–33/40: un tramo estable. Se adopta 0,35 (suelta en 0,175). Por dedo: índices 5/5, mano derecha 5/5 en todos; medio izquierdo 2/5, anular izquierdo 1/5. Doblar un dedo es un gesto que la webcam frontal sí ve, al contrario que el toque en la mesa.
+
 **Siguientes pasos con más potencial que ajustar umbrales:**
 1. una cámara a la altura de la mesa, mirando los dedos de lado (un móvil como webcam);
 2. un gesto más visible que el toque, como doblar el dedo (ángulo de la articulación PIP);

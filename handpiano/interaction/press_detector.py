@@ -108,11 +108,12 @@ class PressConfig:
         Signal ``flex`` (apparent finger length, knuckle → tip, in palm lengths, negated): bending
         towards a camera that faces the palm foreshortens the finger from ~1.4 to well under 1 palm
         length, while the 2D joint angle barely changes until the tip passes below the knuckle.
-        press_on 0.5 / release_off 0.25 palm lengths (about a third and a sixth of an extended
-        finger) are PROVISIONAL, until measured with
-        ``--record-trace … --trace-protocol dedos --dedo-nota``.
+        press_on 0.35 / release_off 0.175 palm lengths, measured on notas_3 (guided ``dedos`` protocol,
+        40 cues, 2026-10-15): 0.5 → 18/40 recognised (8 extra presses); 0.30–0.40 → 32–33/40 (18–23
+        extra), a plateau, so 0.35 is not a lucky value. On recordings with a wrong posture (notas_1,
+        notas_2) 0.35 adds at most 3 extra presses. One player, one camera: re-measure with more.
         """
-        values: dict[str, object] = {"feature": "flex", "press_on": 0.5, "release_off": 0.25,
+        values: dict[str, object] = {"feature": "flex", "press_on": 0.35, "release_off": 0.175,
                                      "finger_notes": True}
         values.update(overrides)
         return cls(**values)  # type: ignore[arg-type]
