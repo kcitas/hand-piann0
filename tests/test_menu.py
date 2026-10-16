@@ -87,3 +87,9 @@ def test_calibration_buttons_only_for_the_table_piano(tmp_path):
         assert window.calibrate_button.isVisible() is visible and window.forget_button.isVisible() is visible
         app.shutdown()
         window.close()
+
+
+def test_the_synthesized_piano_can_be_chosen_from_the_command_line():
+    from handpiano.app.main import parse_args
+
+    assert parse_args(["--instrument", "synth"]).instrument == "synth"

@@ -19,6 +19,7 @@ from PySide6.QtWidgets import QApplication, QWidget  # noqa: E402
 from handpiano.app.application import Application  # noqa: E402
 from handpiano.app.config import AppConfig  # noqa: E402
 from handpiano.audio.engine import AudioEngine, NullOutput, SoundDeviceOutput  # noqa: E402
+from handpiano.audio.instruments import INSTRUMENTS  # noqa: E402
 from handpiano.instrument.keyboard import KeyboardLayout  # noqa: E402
 from handpiano.interaction.press_detector import PressConfig  # noqa: E402
 from handpiano.interaction.trace_landmarks import sidecar_paths  # noqa: E402
@@ -77,8 +78,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
                         help="diagnóstico: una línea en consola por pulsación (detector → nota → motor de audio)")
     parser.add_argument("--debug-keys", action="store_true",
                         help="diagnóstico: una línea en consola por cada tecla que entrega el sistema")
-    parser.add_argument("--instrument", choices=("grand", "upright", "electric"), default="grand",
-                        help="instrumento inicial (por defecto grand)")
+    parser.add_argument("--instrument", choices=tuple(INSTRUMENTS), default="grand",
+                        help="instrumento inicial (por defecto grand; synth = Piano sintético)")
     parser.add_argument("--confianza", type=float, default=None, metavar="0-1",
                         help="confianza mínima de MediaPipe para detectar y seguir las manos (por defecto 0.5); "
                              "más baja = pierde menos las manos, pero puede ver manos donde no las hay")
@@ -113,6 +114,9 @@ def run_menu(qt_app: QApplication, args: argparse.Namespace, config: AppConfig, 
     current: dict[str, object] = {}  # keeps the open mode's objects alive
 
     def back_to_menu() -> None:
+        engine_in_use = current.get("engine")
+        if isinstance(engine_in_use, AudioEngine):  # the next mode starts with the instrument chosen here
+            args.instrument = engine_in_use.status().instrument
         app = current.pop("app", None)
         if isinstance(app, Application):
             app.shutdown()
