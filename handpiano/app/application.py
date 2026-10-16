@@ -244,7 +244,7 @@ class Application(QObject):
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
         """Keyboard (UI thread). While a trace is recorded, physical keys are LABELS only (logged,
         never played); otherwise they play notes (Free Piano), hit lanes D F J K (rhythm game),
-        select instruments (1–3) and change the volume (− / +).
+        select instruments (1–4) and change the volume (− / +).
 
         Qt may offer the same key event to several widgets; per-key down/up state deduplicates it.
         """

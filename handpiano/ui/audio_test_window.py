@@ -20,7 +20,7 @@ from handpiano.ui.instrument_panel import InstrumentPanel
 from handpiano.ui.note_pads import NotePads
 
 HELP = ("Teclas A W S E D F T G Y H U J K O L P Ñ: notas (acordes: varias a la vez) · Z/X: octava · "
-        "1/2/3: instrumento · −/+: volumen · ratón: pulsa y mantén un círculo")
+        "1/2/3/4: instrumento · −/+: volumen · ratón: pulsa y mantén un círculo")
 
 
 class AudioTestWindow(QMainWindow):

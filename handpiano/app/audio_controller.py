@@ -1,6 +1,6 @@
 """Binds the AudioEngine to the instrument panel and to keyboard/mouse note input (Qt main thread).
 
-* panel card click / keys 1–3 → ``set_instrument``; the active card follows the
+* panel card click / keys 1–4 → ``set_instrument``; the active card follows the
   ENGINE's state (loading, ready, error), not the click;
 * "▶ Nota de prueba" selects that instrument and plays C4 for one second;
 * volume slider / keys − and + → ``set_volume``;
@@ -103,7 +103,7 @@ class AudioController(QObject):
         self.panel.set_volume(self.engine.volume)
 
     def handle_shortcut(self, key: str) -> bool:
-        """Keys 1–3 (instrument), − / + (volume). Returns True if handled."""
+        """Keys 1–4 (instrument), − / + (volume). Returns True if handled."""
         if key in INSTRUMENT_KEYS:
             self.select(INSTRUMENT_KEYS[key])
             return True

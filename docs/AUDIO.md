@@ -1,4 +1,4 @@
-# Audio: tres instrumentos reales, motor y medidas
+# Audio: instrumentos, motor y medidas
 
 ## 1. Instrumentos y procedencia
 
@@ -26,6 +26,9 @@ Cada instrumento es una grabación de un instrumento **distinto y real**. Ningun
 | FreePats "Synthesized Piano" | Es un sintetizador, no un Rhodes |
 
 **El repositorio no incluye ninguna muestra.** `scripts/download_sounds.py` las descarga una vez a `sounds/`, que está en `.gitignore`. Es el mismo criterio que con el modelo de MediaPipe.
+
+
+**Piano sintético** (cuarto instrumento, tecla 4): no es una grabación. La app lo genera al arrancar, en memoria, en `handpiano/audio/synth.py`. Cada nota es una suma de armónicos con la leve desafinación de una cuerda real; los agudos se apagan antes que los graves, hay dos cuerdas casi al unísono y un breve golpe de martillo. No necesita descargas ni tiene licencias de terceros. Su volumen está igualado con el Grand: una nota media de 0,042 de RMS frente a 0,033, y un acorde de 4 notas con pico de 0,40.
 
 ## 2. Descarga, tamaño y verificación
 
@@ -128,17 +131,17 @@ AudioEngine  (handpiano/audio/engine.py) — no depende de MediaPipe, Qt ni la c
 | Acción | Cómo |
 | --- | --- |
 | Tocar notas (Piano Libre) | A W S E D F T G Y H U J K O L P Ñ, desde la primera tecla del piano. Z/X cambian la octava |
-| Cambiar de instrumento | Teclas 1, 2 y 3 |
+| Cambiar de instrumento | Teclas 1, 2, 3 y 4 |
 | Volumen | Teclas − y + |
 | Tocar con el ratón | Clic y mantener sobre una tecla del mapa del piano |
 
 **Grabación de trazas:** durante una grabación de trazas las teclas son **solo etiquetas**, se registran pero no suenan. Hay un test que lo comprueba.
 
-## 5. Probar los tres instrumentos
+## 5. Probar los instrumentos
 
 ```bash
 python scripts/download_sounds.py      # una vez
-python -m handpiano --audio-test       # sin cámara: teclado y ratón, acordes, 1/2/3, −/+
+python -m handpiano --audio-test       # sin cámara: teclado y ratón, acordes, 1/2/3/4, −/+
 python scripts/audio_check.py          # diagnóstico: arpegio con cada instrumento y medidas
 python -m handpiano                    # app completa: Piano Libre / Juego Rítmico 4K
 python -m handpiano --instrument electric --no-audio   # opciones
@@ -171,7 +174,7 @@ Medido en este MacBook (altavoces internos, 11 de octubre de 2026) con `scripts/
 
 ## 7. Limitaciones pendientes
 
-- **Gestos de la mano:** la app de escritorio no tenía navegación por gestos. Ahora se navega con ratón y teclado (1/2/3, −/+, botones). La selección por gestos, por ejemplo mantener el dedo sobre una tarjeta, está pendiente.
+- **Gestos de la mano:** la app de escritorio no tenía navegación por gestos. Ahora se navega con ratón y teclado (1/2/3/4, −/+, botones). La selección por gestos, por ejemplo mantener el dedo sobre una tarjeta, está pendiente.
 - **Sin pedal de sustain** y sin el ruido de liberación del martillo, aunque VCSL incluye esas muestras. Las notas mantenidas duran como máximo 5 s.
 - **Velocidad de las pulsaciones de manos:** el mapeo es provisional y no está calibrado frente a una medida.
 - **Teclas iluminadas en silencio:** quedan por un problema de **detección**, no de audio. Un dedo que el detector mantiene en `PRESSED` durante 8–22 s sigue iluminando su tecla después de que la muestra (5 s) se apague: 15 s en `teclado_1` y 20 s en `teclado_2`. Solo se puede medir con etiquetas independientes.

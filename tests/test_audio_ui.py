@@ -43,9 +43,9 @@ def key(kind, text):
     return QKeyEvent(kind, Qt.Key.Key_A, Qt.KeyboardModifier.NoModifier, text, False)
 
 
-def test_panel_shows_three_cards_and_the_active_one(qapp):
+def test_panel_shows_four_cards_and_the_active_one(qapp):
     panel = InstrumentPanel()
-    assert [c.instrument_id for c in panel.cards.values()] == ["grand", "upright", "electric"]
+    assert [c.instrument_id for c in panel.cards.values()] == ["grand", "upright", "electric", "synth"]
     assert "Grand Piano" in panel.cards["grand"].name.text() and panel.cards["electric"].desc.text()
     selected = []
     panel.instrument_selected.connect(selected.append)
@@ -267,3 +267,14 @@ def test_arrow_keys_change_the_sensitivity_live(tmp_path):
 
 def engine_notes_played(app):
     return len([c for c in app.audio.mixer.pending if c[0] == "on"])
+
+
+def test_key_4_selects_the_synthesized_piano(qapp, tmp_path):
+    from handpiano.app.audio_controller import INSTRUMENT_KEYS
+
+    assert INSTRUMENT_KEYS["4"] == "synth"
+    engine = AudioEngine(sounds_dir=tmp_path / "none")
+    controller = AudioController(engine, InstrumentPanel())
+    assert controller.handle_shortcut("4")
+    assert engine.wait_ready(10) and engine.status().instrument == "synth"  # generated: no files needed
+    controller.stop()

@@ -51,7 +51,7 @@ HandPiano sigue tus manos con la webcam y convierte sus movimientos en notas de 
   - **Piano dibujado**: 2 octavas (C4–B5) dibujadas sobre el vídeo; suena la tecla que hay debajo del dedo que baja.
 - **Guía en pantalla**: una barra en la parte de abajo del vídeo se pone **verde** cuando las manos están bien y, si no, dice qué corregir. En "dedo = nota" solo avisa si no ve una mano o si la muñeca se sale de la imagen.
 - **Medidor por dedo**: junto a cada punta de dedo, una barrita muestra cuánto se ha movido ese dedo; se pone verde cuando cuenta como nota. En "dedo = nota", encima de cada dedo aparece su nota (Do, Re, Mi…).
-- **Sonido real**: tres pianos muestreados, motor polifónico propio, cambio de instrumento al vuelo y volumen.
+- **Sonido**: tres pianos grabados (Grand, Upright, Electric) y un **Piano sintético generado por la propia app**, sin grabaciones ni descargas; motor polifónico propio, cambio de instrumento al vuelo y volumen.
 - **Juego Rítmico 4K** con 4 canciones de dominio público, puntuación, combo y precisión.
 - **Pruebas guiadas que se puntúan solas**: al terminar, la app dice cuántos toques reconoció de cada dedo, para comparar posturas y posiciones de cámara sin analizar nada a mano.
 - **Teclado y ratón como alternativa**: siempre se puede tocar también con el teclado del ordenador.
@@ -79,7 +79,8 @@ python -m pip install -e ".[dev]"
 # 1) Modelo de detección de manos (~7.8 MB; se verifica su SHA-256)
 python scripts/download_model.py
 
-# 2) Sonidos de los tres pianos (~110 MB en sounds/; se verifica la afinación de cada muestra)
+# 2) Sonidos de los tres pianos grabados (~110 MB en sounds/; se verifica la afinación de cada muestra).
+#    Opcional: sin ellos funciona el Piano sintético, que la app genera sola.
 python scripts/download_sounds.py
 ```
 
@@ -155,7 +156,7 @@ Un piano de 2 octavas dibujado sobre el vídeo. Con las manos sobre la mesa, **b
 
 ### 🔊 Prueba de sonido
 
-Sin cámara: los tres pianos con el teclado del ordenador y el ratón. Sirve para comprobar que el audio funciona.
+Sin cámara: los cuatro instrumentos con el teclado del ordenador y el ratón. Sirve para comprobar que el audio funciona.
 
 ---
 
@@ -193,7 +194,7 @@ Mensajes de la barra:
 
 | Tecla | Acción |
 | --- | --- |
-| `1` `2` `3` | Instrumento: Grand, Upright, Electric |
+| `1` `2` `3` `4` | Instrumento: Grand, Upright, Electric, Piano sintético |
 | `−` / `+` | Bajar / subir volumen |
 | `A W S E D F T G Y H U J K O L P Ñ` | Notas en Piano Libre (como un teclado de piano: fila de abajo blancas, de arriba negras) |
 | `Z` / `X` | Bajar / subir una octava las notas del teclado |
@@ -221,7 +222,7 @@ Mensajes de la barra:
 | `--start-note NOTA --octaves N` | Teclado (por defecto `C4` y `2` octavas); debe empezar y terminar en tecla blanca |
 | `--instrument grand\|upright\|electric` | Instrumento inicial |
 | `--no-audio` | Sin sonido |
-| `--audio-test` | Prueba de sonido sin cámara: los tres instrumentos con teclado y ratón |
+| `--audio-test` | Prueba de sonido sin cámara: los cuatro instrumentos con teclado y ratón |
 | `--microfono` | Experimental: el micrófono detecta el instante del toque sobre la mesa y la cámara decide qué dedo fue |
 | `--lab` | Abre el Tracking Lab (estado, profundidad y eventos de cada dedo) |
 | `--check-hands` | Validación guiada de mano izquierda/derecha con instrucciones en pantalla |
@@ -343,7 +344,7 @@ Cada grabación escribe `NOMBRE.csv` (por dedo y frame), `NOMBRE.landmarks.csv` 
 | Script | Qué hace |
 | --- | --- |
 | `scripts/download_model.py` | Descarga el modelo y verifica su SHA-256 |
-| `scripts/download_sounds.py` | Descarga las muestras de los tres pianos y verifica la afinación |
+| `scripts/download_sounds.py` | Descarga las muestras de los tres pianos grabados y verifica la afinación (el sintético no necesita descarga) |
 | `scripts/audio_check.py` | Diagnóstico de audio: arpegio, retrasos y cortes |
 | `scripts/analyze_trace.py` | Resumen por dedo de una grabación, avisos y tramos atascados |
 | `scripts/compare_detectors.py` | Reproduce una grabación con el detector anterior y el actual |

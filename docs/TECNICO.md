@@ -591,4 +591,4 @@ Se usa 1280×720 por defecto porque da los mismos fps que 1080p con menos datos 
 - **Paralaje:** la homografía solo es exacta en el plano de las 4 esquinas. Un dedo fuera de ese plano se proyecta con un error que no se ha medido.
 - **Teclas negras:** centradas en la frontera de las blancas, sin el desplazamiento de un piano real.
 - **Calibración:** si se mueve la cámara, la guardada deja de ser válida, pero la app no puede detectarlo; hay que recalibrar.
-- **Instrumento:** hay audio con tres pianos y un juego rítmico, pero no entrenamiento adaptativo. Las limitaciones del audio están en [docs/AUDIO.md](AUDIO.md).
+- **Instrumento:** hay audio con tres pianos grabados y uno sintético, y un juego rítmico, pero no entrenamiento adaptativo. Las limitaciones del audio están en [docs/AUDIO.md](AUDIO.md).

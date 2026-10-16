@@ -38,8 +38,9 @@ def cents(f: float, midi: int) -> float:
 
 
 def test_three_real_instruments_with_distinct_sources_and_licences():
-    assert set(INSTRUMENTS) == {"grand", "upright", "electric"}
-    urls = [s.url for i in INSTRUMENTS.values() for s in i.samples]
+    recorded = {k: i for k, i in INSTRUMENTS.items() if not i.synthesized}
+    assert set(recorded) == {"grand", "upright", "electric"}
+    urls = [s.url for i in recorded.values() for s in i.samples]
     assert len(urls) == len(set(urls))  # no recording shared between instruments
     for instrument in INSTRUMENTS.values():
         assert instrument.license and instrument.attribution and instrument.source and instrument.recorded
@@ -50,7 +51,23 @@ def test_three_real_instruments_with_distinct_sources_and_licences():
         for layer in range(instrument.layers):
             assert {s.root for s in instrument.samples if s.layer == layer} == set(roots)
     assert "NC" in INSTRUMENTS["electric"].license  # non-commercial: must stay visible
-    assert all("@" in i.source for i in INSTRUMENTS.values())  # pinned commit in the source
+    assert all("@" in i.source for i in recorded.values())  # pinned commit in the source
+
+
+def test_the_synthesized_piano_needs_no_files_and_sounds_in_tune(tmp_path):
+    from handpiano.audio.synth import PEAK, piano_note
+
+    instrument = INSTRUMENTS["synth"]
+    assert instrument.synthesized and not any(s.url for s in instrument.samples)
+    bank = load_bank(tmp_path / "nothing_downloaded", "synth")  # no sounds/ folder at all
+    assert bank.roots == list(range(RANGE[0], RANGE[1] + 1))
+    for midi in (48, 60, 69, 84, 96):
+        y = piano_note(midi)
+        assert abs(cents(peak_frequency(y[: 44100 // 2]), midi)) < 5, midi
+        assert abs(float(np.abs(y).max()) - PEAK) < 1e-3  # every note the same peak level
+    lo, hi = piano_note(48), piano_note(96)
+    # The treble dies away sooner than the bass, as on a piano.
+    assert np.abs(hi[44100:]).max() < np.abs(lo[44100:]).max()
 
 
 @pytest.mark.parametrize("instrument", list(INSTRUMENTS))

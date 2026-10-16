@@ -20,6 +20,8 @@ from pathlib import Path
 import numpy as np
 
 from handpiano.audio.instruments import INSTRUMENTS, Instrument
+from handpiano.audio.synth import SAMPLE_RATE as SYNTH_RATE
+from handpiano.audio.synth import piano_note
 from handpiano.audio.wavio import WavError, read_wav
 
 BANK_FORMAT = 1
@@ -84,6 +86,16 @@ class SoundBank:
         return Region(sample, ratio, gain)
 
 
+def synthesize_bank(instrument: Instrument) -> SoundBank:
+    """A generated instrument: one note per sample root, computed in memory (no files)."""
+    samples = []
+    for src in instrument.samples:
+        data = np.ascontiguousarray((piano_note(src.root) * 32767.0).astype(np.int16)[:, None])
+        data.setflags(write=False)
+        samples.append(Sample(src.root, src.layer, data, SYNTH_RATE))
+    return SoundBank(instrument, samples)
+
+
 def bank_dir(sounds_dir: Path, instrument_id: str) -> Path:
     return sounds_dir / instrument_id
 
@@ -93,6 +105,8 @@ def load_bank(sounds_dir: Path, instrument_id: str) -> SoundBank:
     instrument = INSTRUMENTS.get(instrument_id)
     if instrument is None:
         raise SoundBankError(f"instrumento desconocido: {instrument_id!r}")
+    if instrument.synthesized:
+        return synthesize_bank(instrument)
     folder = bank_dir(sounds_dir, instrument_id)
     manifest_path = folder / "bank.json"
     if not manifest_path.is_file():

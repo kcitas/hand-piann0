@@ -202,12 +202,16 @@ def build(instrument: Instrument, sounds_dir: Path, force: bool) -> bool:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--only", choices=sorted(INSTRUMENTS), action="append")
+    parser.add_argument("--only", choices=sorted(i for i, inst in INSTRUMENTS.items() if not inst.synthesized),
+                        action="append")
     parser.add_argument("--sounds-dir", type=Path, default=DEFAULT_SOUNDS_DIR)
     parser.add_argument("--force", action="store_true", help="vuelve a descargar aunque ya esté instalado")
     args = parser.parse_args()
     ok = True
     for instrument_id in args.only or list(INSTRUMENTS):
+        if INSTRUMENTS[instrument_id].synthesized:
+            print(f"{INSTRUMENTS[instrument_id].name}: lo genera la app, no hay nada que descargar")
+            continue
         try:
             ok &= build(INSTRUMENTS[instrument_id], args.sounds_dir, args.force)
         except OSError as exc:

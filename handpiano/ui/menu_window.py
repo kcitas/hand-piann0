@@ -19,7 +19,7 @@ MODES: tuple[tuple[str, str, str], ...] = (
      "Un piano de 2 octavas dibujado sobre el vídeo.\n"
      "Manos sobre la mesa: baja un dedo encima de una tecla para tocarla."),
     ("sonido", "🔊  Prueba de sonido",
-     "Sin cámara: los tres pianos con el teclado del ordenador y el ratón."),
+     "Sin cámara: los cuatro instrumentos con el teclado del ordenador y el ratón."),
 )
 
 STYLE = f"""

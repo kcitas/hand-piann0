@@ -66,7 +66,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--audio-test",
         action="store_true",
-        help="prueba de sonido sin cámara: los tres instrumentos con el teclado y el ratón",
+        help="prueba de sonido sin cámara: los cuatro instrumentos con el teclado y el ratón",
     )
     parser.add_argument("--no-audio", action="store_true", help="sin salida de sonido")
     parser.add_argument("--microfono", action="store_true",
